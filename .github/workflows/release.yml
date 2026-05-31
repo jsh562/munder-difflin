@@ -37,7 +37,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build & package
+      - name: Compile (electron-vite → out/)
+        run: npm run build
+
+      - name: Package installers
         # GH_TOKEN lets electron-builder skip its own publish; we upload via the
         # release step below for full control over the asset set.
         run: npx electron-builder ${{ matrix.args }} --publish never
