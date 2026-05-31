@@ -6,3 +6,7 @@ dist/
 .vite/
 .env
 .env.local
+.gstack/
+
+# heavy hero source — only the compressed hero.mp4/.webm are deployed
+docs/media/*.mov

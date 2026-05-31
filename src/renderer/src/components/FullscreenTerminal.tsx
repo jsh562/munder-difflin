@@ -71,7 +71,7 @@ export function FullscreenTerminal() {
         <span style={{
           fontFamily: 'var(--cth-font-display)', fontSize: 12, lineHeight: '20px',
           color: 'var(--cth-ink-900)'
-        }}>CLAUDE TERMINAL HARNESS · FULLSCREEN</span>
+        }}>MUNDER DIFFLIN · FULLSCREEN</span>
       </div>
 
       {/* Tabs */}

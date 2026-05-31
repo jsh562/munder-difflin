@@ -1,8 +1,8 @@
 {
-  "name": "claude-terminal-harness",
+  "name": "munder-difflin",
   "version": "0.1.0",
   "private": true,
-  "description": "A Nintendo-styled desktop control room for your Claude Code agents.",
+  "description": "Local multi-agent harness for Claude Code: autonomous agents that message, route, and remember — coordinated by a GOD orchestrator and visualized as avatars at work.",
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",

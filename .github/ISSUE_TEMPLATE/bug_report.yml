@@ -1,0 +1,58 @@
+name: Bug report
+description: Something isn't working as expected.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to file a bug! Please fill out the sections below.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug, plus what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Run `npm run dev`
+        2. Add an agent with command `...`
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      description: Console output, stack traces, or a screenshot/clip if it's visual.
+      render: shell
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: e.g. 15.0
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node version
+      placeholder: node -v
+    validations:
+      required: true
+  - type: input
+    id: claude
+    attributes:
+      label: Claude Code version (if relevant)
+      placeholder: claude --version
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-flight
+      options:
+        - label: I re-ran `npm install` so `node-pty` is rebuilt for the current Electron ABI.
+          required: true
+        - label: I searched existing issues and this isn't a duplicate.
+          required: true

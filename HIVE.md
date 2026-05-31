@@ -1,6 +1,6 @@
 # The Hive — autonomous multi-agent layer
 
-> How the Claude Terminal Harness turns a room full of independent `claude`
+> How Munder Difflin turns a room full of independent `claude`
 > processes into a collaborating, self-coordinating team with persistent memory,
 > a shared blackboard, and a "god" orchestrator that runs the floor.
 

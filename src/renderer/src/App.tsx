@@ -110,13 +110,22 @@ export function App() {
           userSelect: 'none'
         }}
       >
-        <span style={{
-          fontFamily: 'var(--cth-font-display)',
-          fontSize: 12,
-          lineHeight: '20px',
-          color: 'var(--cth-ink-900)'
-        }}>
-          CLAUDE TERMINAL HARNESS
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <span style={{
+            display: 'inline-grid', placeItems: 'center',
+            width: 20, height: 20,
+            background: '#6E1423', color: '#F4F1EA',
+            fontFamily: 'var(--cth-font-display)', fontSize: 7, letterSpacing: -1,
+            boxShadow: 'var(--cth-shadow-hard)'
+          }}>MD</span>
+          <span style={{
+            fontFamily: 'var(--cth-font-display)',
+            fontSize: 12,
+            lineHeight: '20px',
+            color: 'var(--cth-ink-900)'
+          }}>
+            MUNDER DIFFLIN
+          </span>
         </span>
         <span style={{
           fontFamily: 'var(--cth-font-ui)',

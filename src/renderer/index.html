@@ -2,14 +2,36 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Claude Terminal Harness</title>
+    <title>Munder Difflin</title>
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:;" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Pixelify+Sans:wght@400;500;700&family=VT323&display=swap" rel="stylesheet" />
+    <style>
+      #cth-splash {
+        position: fixed; inset: 0; display: flex; flex-direction: column;
+        align-items: center; justify-content: center; gap: 14px;
+        background: #FFF8E7; color: #1A1320;
+        font-family: "Pixelify Sans", system-ui, sans-serif;
+      }
+      #cth-splash .mk {
+        display: grid; place-items: center; width: 56px; height: 56px;
+        background: #6E1423; color: #F4F1EA; border: 4px solid #4A0D17;
+        font-family: "Press Start 2P", monospace; font-size: 16px; letter-spacing: -2px;
+        box-shadow: 4px 4px 0 rgba(26,19,32,0.25);
+      }
+      #cth-splash .title { font-family: "Press Start 2P", monospace; font-size: 13px; }
+      #cth-splash .hint { font-size: 15px; color: #6B5878; }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="cth-splash">
+        <div class="mk">MD</div>
+        <div class="title">MUNDER DIFFLIN</div>
+        <div class="hint">booting the hive…</div>
+      </div>
+    </div>
     <script type="module" src="./src/main.tsx"></script>
   </body>
 </html>

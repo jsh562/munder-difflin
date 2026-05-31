@@ -36,7 +36,7 @@ function createWindow(): void {
     height: 900,
     minWidth: 1280,
     minHeight: 800,
-    title: 'Claude Terminal Harness',
+    title: 'Munder Difflin',
     backgroundColor: '#FFF8E7',
     titleBarStyle: 'hiddenInset',
     show: false,

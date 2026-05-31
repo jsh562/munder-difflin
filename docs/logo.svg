@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="660" height="420" viewBox="0 0 660 420" role="img" aria-label="Munder Difflin Inc — Multi-Agent Harness">
+  <title>Munder Difflin Inc</title>
+  <desc>Dunder Mifflin–style wordmark for the Munder Difflin multi-agent harness.</desc>
+  <defs>
+    <style>
+      .mark   { font-family: Impact, "Anton", "Arial Narrow", "Haettenschweiler", sans-serif; fill: #F4F1EA; }
+      .huge   { font-size: 150px; font-weight: 900; letter-spacing: 1px; }
+      .inc    { font-size: 44px;  font-weight: 900; }
+      .sub    { font-family: "Tahoma", "DejaVu Sans", Geneva, sans-serif; font-size: 27px; letter-spacing: 13px; fill: #F4F1EA; }
+    </style>
+  </defs>
+
+  <!-- Maroon plate -->
+  <rect x="0" y="0" width="660" height="420" fill="#6E1423"/>
+  <rect x="0" y="0" width="660" height="420" fill="none" stroke="#4A0D17" stroke-width="10"/>
+
+  <!-- Wordmark -->
+  <text class="mark huge" x="46" y="170" textLength="500" lengthAdjust="spacingAndGlyphs">MUNDER</text>
+  <text class="mark huge" x="46" y="312" textLength="520" lengthAdjust="spacingAndGlyphs">DIFFLIN,</text>
+
+  <!-- INC. rotated up the right edge -->
+  <text class="mark inc" x="600" y="312" transform="rotate(-90 600 312)">INC.</text>
+
+  <!-- Subline (parody of "PAPER COMPANY") -->
+  <text class="sub" x="50" y="372">MULTI-AGENT HARNESS</text>
+</svg>

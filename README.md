@@ -1,123 +1,145 @@
-# Claude Terminal Harness
+<div align="center">
 
-> A Nintendo-styled desktop control room for the [Claude Code](https://claude.com/claude-code) agents you run in your terminal.
+<img src="./docs/logo.svg" alt="Munder Difflin Inc — Multi-Agent Harness" width="340">
 
-Each agent you spawn becomes a Sims-style avatar living on a shared 2D office floor. You watch them walk between stations as they work, stream their real terminal output in a side panel, type prompts back to them, and browse their files and git history — all from one window.
+# Munder Difflin
 
-<p align="center">
+**Local multi-agent harness for [Claude Code](https://claude.com/claude-code).**
+Autonomous agents that message, route, and remember — coordinated by a **GOD** orchestrator
+you talk to, and visualized as avatars at work on a shared office floor.
+
+<p>
   <em>Electron · React · TypeScript · Pixi.js · xterm.js · node-pty</em>
 </p>
 
-<p align="center">
-  <a href="./LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-FFD93D.svg?style=flat-square&labelColor=1A1320"></a>
-  <img alt="Status: prototype" src="https://img.shields.io/badge/status-prototype-FF6B6B.svg?style=flat-square&labelColor=1A1320">
-  <img alt="Platform: macOS" src="https://img.shields.io/badge/platform-macOS-4ECDC4.svg?style=flat-square&labelColor=1A1320">
+<p>
+  <a href="./LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-F4D35E.svg?style=flat-square&labelColor=6E1423"></a>
+  <img alt="Status: prototype" src="https://img.shields.io/badge/status-working%20prototype-F4F1EA.svg?style=flat-square&labelColor=6E1423">
+  <img alt="Platform: macOS" src="https://img.shields.io/badge/platform-macOS-F4F1EA.svg?style=flat-square&labelColor=6E1423">
+  <a href="./CONTRIBUTING.md"><img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-F4D35E.svg?style=flat-square&labelColor=6E1423"></a>
 </p>
 
+</div>
+
+---
+
 > [!NOTE]
-> **Status: working prototype.** The Electron shell, the office floor, real PTY terminals, and the file/git tooling are all functional. The *avatar behavior* (walking to stations based on which tool an agent is using) is currently driven by a synthetic event loop — see [Architecture](#architecture). Wiring it to real Claude Code hooks is the headline next milestone.
-
----
-
-## Table of contents
-
-- [What it is](#what-it-is)
-- [Features](#features)
-- [Screenshots](#screenshots)
-- [Getting started](#getting-started)
-- [Architecture](#architecture)
-- [Project structure](#project-structure)
-- [Design system](#design-system)
-- [Configuration & data](#configuration--data)
-- [Roadmap](#roadmap)
-- [Contributing](#contributing)
-- [License](#license)
-- [Acknowledgements](#acknowledgements)
-
----
+> **The world's best agents. The world's worst paper company.**
+> Munder Difflin takes the `claude` CLI sessions you already run in your terminal and turns them
+> into a self-coordinating team: each agent gets long-term memory, a mailbox, and a desk on a 2D
+> office floor — and a **GOD orchestrator agent** routes work between them while you watch.
 
 ## What it is
 
-- An **Electron desktop app** (macOS-first) that gives you a single pane of glass over multiple Claude Code sessions.
-- Each session runs as a real process in a **pseudo-terminal** (`node-pty`) owned by the app's main process. The raw byte stream is rendered with **xterm.js** — byte-for-byte authentic, ANSI and all.
-- Each session is also an **avatar** on a Pixi.js "office floor." Avatars walk around, sit at desks, and visit stations.
-- A side panel gives you, per agent: the live terminal, a command bar to type back into the session, a sandboxed **file browser + editor** (CodeMirror), and a **git tab** (status, log, commit graph, branches).
+Munder Difflin is a desktop app that wraps **real Claude Code terminals** as fully-capable agents,
+wires them into a **hive mind**, and puts a **GOD orchestration agent** in charge — the one agent
+*you* talk to in order to get things done. Under the hood it runs the **fastest memory layer in the
+world** so every agent remembers what it learns and recalls it instantly.
 
-### What it is *not* (by design, for now)
+- **Every terminal is an agent.** Each `claude` session runs as a real process in a pseudo-terminal
+  (`node-pty`), byte-for-byte authentic, rendered with xterm.js.
+- **Every agent is an avatar.** Sessions appear as characters on a Pixi.js office floor — they walk
+  to stations as they work, and envelopes fly desk-to-desk when they message each other.
+- **The hive coordinates them.** Agents read their memory and drain a mailbox; the router moves
+  messages between inboxes; the GOD agent adjudicates, assigns, and escalates only when it needs you.
+- **Memory that's instant.** A markdown-first memory layer with a semantic recall index means agents
+  remember across sessions and recall in milliseconds.
 
-- Not a replacement for the `claude` CLI — the CLI is the runtime, this app is the viewer/controller.
-- Not a remote dashboard — local sessions only, no auth, no network surface.
-- Not an agent-to-agent task scheduler — agents message each other (and you *see* an envelope fly desk-to-desk when they do), but the floor doesn't reassign or load-balance work between them yet.
+## How it works
 
----
+```
+            you ── talk to ──►  ┌─────────────┐
+                                │  GOD agent  │  orchestrator / supervisor
+                                │ (Michael's  │  roster · routing · adjudication
+                                │   office)   │  blackboard · task ledger
+                                └──────┬──────┘
+                                       │ assigns · routes · escalates
+              ┌────────────────────────┼────────────────────────┐
+              ▼                         ▼                         ▼
+        ┌───────────┐            ┌───────────┐            ┌───────────┐
+        │  agent A  │  message   │  agent B  │  message   │  agent C  │
+        │  claude   │ ─────────► │  claude   │ ─────────► │  claude   │
+        │  + memory │            │  + memory │            │  + memory │
+        └───────────┘            └───────────┘            └───────────┘
+              └──────── shared hive: memory · mailbox · blackboard · log ───────┘
+```
+
+1. **You spawn agents** — each is a normal `claude` process with its own working directory,
+   identity, and hook lifecycle.
+2. **Agents collaborate through the hive** — a local git repo of plain files. They write to their own
+   `outbox/`; the harness's router delivers into recipients' `inbox/`. No agent ever touches git
+   (single-committer design avoids `index.lock` corruption).
+3. **The GOD agent runs the floor** — it reads every request, resolves routine ones itself (keeping
+   the system fully autonomous), and only escalates *critical* items (spend, destructive ops, scope
+   changes) into an approvals queue you act on.
+4. **Everything is visible** — you watch avatars move, envelopes fly, and the live terminal stream;
+   you can type back into any session, browse its files, and read its git history.
+
+See [`HIVE.md`](./HIVE.md) for the full multi-agent design, [`SPEC.md`](./SPEC.md) for the
+terminal/event plane, and [`DESIGN.md`](./DESIGN.md) for the visual system.
 
 ## Features
 
 | Area | What works today |
 |---|---|
-| **Real terminals** | Spawn any command (default: `claude`) in a `node-pty` PTY. Full read/write/resize/kill, live data + exit streaming over IPC, multi-agent. |
-| **Office floor** | Pixi.js scene rendering a Tiled office map, camera, recolored character cast, pathfinding, seat assignment, and tool-bubble overlays. |
-| **Message handoffs** | When the hive routes a message, an envelope flies from the sender's desk to each recipient (tinted by speech-act; escalations fly to the door) and pops an arrival sparkle — the multi-agent collaboration made visible. |
-| **Agent panel** | Per-agent detail panel with terminal view, command bar, and a fullscreen terminal mode. |
-| **File browser** | Sandboxed `listDir` / `readFile` / `writeFile` rooted at each agent's cwd, with a file tree and a syntax-highlighting CodeMirror editor (JS/TS, HTML, CSS, JSON, Markdown, Python, YAML). |
-| **Git tab** | Branch, working-tree status, commit log, branch list, ahead/behind, and a rendered commit graph. |
-| **Onboarding wizard** | First-run setup: pick a harness home, register repositories, choose default command and auto-mode. |
-| **Safe quit** | Intercepts Cmd-Q and the red close button when live PTYs exist, and warns before killing them. |
-| **Design system** | Fully tokenized SNES/Animal-Crossing aesthetic — pixel panels, buttons, badges, hand-drawn icons. See [`DESIGN.md`](./DESIGN.md). |
-| **Avatar behavior** | ⚠️ Driven by a mock event loop (`mockEvents.ts`) — not yet wired to real Claude Code tool events. |
+| **Real terminals** | Spawn any command (default: `claude`) in a `node-pty` PTY. Full read/write/resize/kill, live streaming over IPC, multi-agent. |
+| **The hive** | On-disk multi-agent layer: per-agent identity + long-term memory, atomic-file mailboxes, a shared blackboard, append-only event log, single-committer git. |
+| **GOD orchestrator** | An always-on supervisor agent that adjudicates traffic, routes tasks, scribes the blackboard, and escalates only critical items to you. |
+| **Memory layer** | Markdown-first long-term memory per agent, mined into a shared semantic palace for instant recall; searchable from the UI. Degrades gracefully when the index isn't installed. |
+| **Office floor** | Pixi.js scene with a Tiled office map, camera, recolored cast, pathfinding, seat assignment, and tool-bubble overlays. |
+| **Message handoffs** | When the hive routes a message, an envelope flies from sender to recipient (tinted by speech-act; escalations fly to the door) and pops an arrival sparkle. |
+| **Per-agent panel** | Live terminal, command bar to type back, fullscreen terminal, sandboxed file browser + CodeMirror editor, and a git tab (status, log, commit graph, branches). |
+| **Approvals & memory panels** | Human-in-the-loop approval queue for escalations; a memory search panel over the shared palace. |
+| **Onboarding wizard** | First-run setup: harness home, registered repos, default command, auto-mode. |
+| **Design system** | Fully tokenized SNES / Animal-Crossing aesthetic — pixel panels, buttons, badges, hand-drawn icons. See [`DESIGN.md`](./DESIGN.md). |
 
----
-
-## Screenshots
-
-> _Add screenshots/GIFs here._ A short screen recording of avatars walking between stations while a real `claude` session streams in the side panel is the best way to show what this is.
-
-```
-docs/
-  floor.png         ← the office floor with avatars
-  agent-panel.png   ← terminal + command bar + file/git tabs
-```
-
----
+> [!IMPORTANT]
+> **Status: working prototype.** The Electron shell, office floor, real PTY terminals, the hive
+> (memory/mailbox/router/GOD agent), and the file/git tooling are functional. Wiring avatar movement
+> fully to real Claude Code tool events is the headline next milestone (today it falls back to a
+> synthetic event loop where hooks aren't attached).
 
 ## Getting started
 
 ### Prerequisites
 
-- **macOS** (the app is macOS-first; Windows/Linux are untested).
+- **macOS** (macOS-first; Windows/Linux untested).
 - **Node.js 18+** and npm.
-- A **C/C++ toolchain** for building `node-pty`'s native addon — on macOS, install the Xcode Command Line Tools:
+- A **C/C++ toolchain** for `node-pty`'s native addon — on macOS, install Xcode Command Line Tools:
   ```bash
   xcode-select --install
   ```
-- **[Claude Code](https://claude.com/claude-code)** installed and on your `PATH` if you want agents to actually run `claude` (the default command). Any other command works too.
+- **[Claude Code](https://claude.com/claude-code)** on your `PATH` so agents can run `claude`
+  (the default command). Any other command works too.
+- *Optional:* the semantic memory index for instant cross-session recall (the app works without it —
+  markdown memory still functions).
 
 ### Install & run
 
 ```bash
-git clone <your-fork-url> claudeTerminalHarness
-cd claudeTerminalHarness
+git clone https://github.com/chaitanyagiri/munder-difflin.git
+cd munder-difflin
 npm install        # postinstall rebuilds node-pty against Electron's ABI
 npm run dev        # launches the Electron app with hot reload
 ```
 
-On first launch you'll go through the onboarding wizard, then land on an empty floor. Use **Add agent** to spawn your first session.
+On first launch you'll go through the onboarding wizard, then land on the floor. Use **Add agent** to
+spawn your first session — the GOD agent seats itself in Michael's office automatically.
 
 ### Other scripts
 
 ```bash
 npm run build      # production build via electron-vite
 npm run preview    # preview the production build
-npm run typecheck  # type-check both the node (main/preload) and web (renderer) projects
+npm run typecheck  # type-check the node (main/preload) and web (renderer) projects
 ```
 
-> If `node-pty` fails to load after an Electron upgrade, re-run `npm install` (the `postinstall` hook runs `electron-rebuild` against the current Electron ABI).
-
----
+> If `node-pty` fails to load after an Electron upgrade, re-run `npm install` (the `postinstall` hook
+> runs `electron-rebuild` against the current Electron ABI).
 
 ## Architecture
 
-The load-bearing idea is **two data planes** feeding one renderer:
+Two data planes feed one renderer:
 
 ```
 ┌───────────────────────────────────────────────────────────────┐
@@ -128,25 +150,27 @@ The load-bearing idea is **two data planes** feeding one renderer:
 │   └─────────▲────────┘    └────────────▲─────────────────┘    │
 │             │ avatar state             │ pty bytes / fs / git  │
 └─────────────┼──────────────────────────┼───────────────────────┘
-              │ IPC (contextBridge: window.cth)                    
+              │ IPC (contextBridge: window.cth)
        ┌──────┴──────────┐        ┌──────┴─────────────┐
        │  Event Plane    │        │  Terminal Plane    │
-       │  (mock today →  │        │  node-pty PTYs     │
-       │   CC hooks v1)  │        │  + fs + git        │
-       └─────────────────┘        └──────▲─────────────┘
-                                         │ stdin / stdout
-                                  ┌──────┴──────────────┐
-                                  │  claude (or any cmd)│
-                                  └─────────────────────┘
+       │  hooks / hive   │        │  node-pty PTYs     │
+       │  router + GOD   │        │  + fs + git        │
+       └────────▲────────┘        └──────▲─────────────┘
+                │ hook payloads          │ stdin / stdout
+                └─────────┬──────────────┘
+                   ┌──────┴──────────────┐
+                   │  claude (or any cmd)│
+                   └─────────────────────┘
 ```
 
-**Terminal plane (real).** The Electron main process owns a `PtyManager` that spawns each agent as a `node-pty` process, streams its output to the renderer over per-id IPC channels (`pty:data:<id>`), and accepts keystrokes back. The renderer never touches Node directly — everything goes through a typed `window.cth` bridge exposed in [`src/preload/index.ts`](./src/preload/index.ts). The same bridge exposes sandboxed filesystem and git helpers.
-
-**Event plane (mocked).** Avatar state — _which station is this agent walking to, is it thinking/working/blocked_ — is currently produced by a synthetic loop in [`mockEvents.ts`](./src/renderer/src/store/mockEvents.ts). The intended v1 replacement is **Claude Code hooks** (`PreToolUse`, `PostToolUse`, `Notification`, `Stop`, …): a tiny shim CLI installed per project that POSTs hook payloads to a socket the main process listens on, so avatar movement reflects what the agent is _actually_ doing. See [`SPEC.md`](./SPEC.md) for the full design.
-
-> **Note on the spec vs. the code:** [`SPEC.md`](./SPEC.md) originally described attaching to existing **tmux** panes. The implementation has since moved to spawning PTYs **directly** via `node-pty`, which removes the tmux dependency. Treat the code as the source of truth for the terminal plane; the spec remains the reference for the event plane and product vision.
-
----
+- **Terminal plane.** The main process owns a `PtyManager` that spawns each agent as a `node-pty`
+  process and streams output over per-id IPC (`pty:data:<id>`). The renderer talks only through a
+  typed `window.cth` bridge ([`src/preload/index.ts`](./src/preload/index.ts)), which also exposes
+  sandboxed filesystem and git helpers.
+- **Hive / event plane.** `hive.ts` is the on-disk multi-agent layer; `hooks.ts` runs a Unix-socket
+  server that the per-agent `cth-hook` shim POSTs Claude Code hook payloads to (`PreToolUse`,
+  `PostToolUse`, `Stop`, …); `memory.ts` wraps the semantic memory CLI. The router delivers messages,
+  the GOD agent adjudicates, and a `Stop`-loop keeps idle agents draining their inboxes.
 
 ## Project structure
 
@@ -155,98 +179,67 @@ src/
   main/                      Electron main process (Node)
     index.ts                 window, IPC handlers, quit guard
     pty.ts                   node-pty manager (spawn/write/resize/kill/stream)
+    hive.ts                  on-disk multi-agent layer (memory, mailboxes, router)
+    hooks.ts                 UDS hook server + cth-hook shim + Stop-loop
+    memory.ts                semantic memory layer (CLI wrapper, degrade-to-noop)
     config.ts                harness config persistence + home setup
-    fs.ts                    sandboxed listDir / readFile / writeFile
-    git.ts                   branch / status / log / branches / ahead-behind
-  preload/
-    index.ts                 contextBridge → typed `window.cth` API
-    index.d.ts               renderer-side type declarations
-  renderer/
-    index.html
-    src/
-      App.tsx                top-level layout + wiring
-      design/                tokens.css / tokens.ts / global.css (source of truth)
-      components/            PixelPanel, PixelButton, AgentDetailPanel, CommandBar,
-                             TerminalView, FileTree, CodeEditor, GitTab, CommitGraph, …
-      scene/office/          Pixi office floor: OfficeFloor, Character, Camera,
-                             TiledMapRenderer, pathfinding, ToolBubble, cast, SeatPool
-      store/                 zustand store + mock event loop + config types
-      hooks/                 usePtyParser, useTypewriter
-      assets/                tilesets, maps, character sheets (see ATTRIBUTION.md)
-DESIGN.md                    canonical design system
-SPEC.md                     product + architecture spec (event plane, vision)
+    fs.ts / git.ts           sandboxed filesystem + git bridges
+  preload/                   contextBridge → typed window.cth API
+  renderer/src/
+    App.tsx                  top-level layout + wiring
+    design/                  tokens.css / tokens.ts / global.css (design source of truth)
+    components/              PixelPanel, AgentDetailPanel, CommandBar, ApprovalsPanel, MemoryPanel, …
+    scene/office/            Pixi office floor: OfficeFloor, Character, Camera, cast, pathfinding, …
+    store/ · hooks/          zustand store, event loop, PTY parser, typewriter
+    assets/                  tilesets, maps, character sheets (see ATTRIBUTION.md)
+docs/                        logo, banner, and the landing page (GitHub Pages → munderdiffl.in)
+docs/media/                  landing-page posters + rendered Remotion clips
+landing-remotion/            Remotion project that renders the landing page's "how it works" clips
+HIVE.md · SPEC.md · DESIGN.md   multi-agent · terminal/event · visual design
 ```
-
----
 
 ## Design system
 
-The aesthetic is **Animal Crossing × Earthbound × SNES menu UI** — pixel-snapped, chunky, friendly. [`DESIGN.md`](./DESIGN.md) is canonical; every component derives from its tokens. Highlights:
-
-- Three fonts: **Press Start 2P** (display), **Pixelify Sans** (UI), **VT323** (terminal).
-- **4 px** spacing grid, integer-only transforms, no CSS blur, no `border-radius`.
-- SNES **three-layer panel borders** via nested `box-shadow inset`.
-- Hard **4/4 drop shadows** — no soft shadows anywhere.
-- Limited palette: ≤ 8 colors per screen, status communicated by **color + icon + avatar position** (never color alone).
-- Tokens live in two synced files: `design/tokens.css` (CSS variables) and `design/tokens.ts` (TS objects for Pixi/inline styles).
-
----
-
-## Configuration & data
-
-App configuration is a small JSON document (`HarnessConfig`) managed by the main process and read through `window.cth.getConfig()`:
-
-| Field | Meaning |
-|---|---|
-| `onboardingComplete` | Whether the first-run wizard has been finished. |
-| `harnessHome` | Directory the harness uses as its home/workspace root. |
-| `registeredRepos` | Repositories the user has registered. |
-| `autoMode` | Toggles automatic behavior shown in the title bar. |
-| `defaultCommand` | Command spawned for a new agent (default: `claude`). |
-
-Filesystem and git access from the renderer is **sandboxed** — every `fs:*` and `git:*` IPC call is rooted at a given directory and validated in the main process, so the UI can only reach paths under an agent's working directory.
-
----
+The aesthetic is **Animal Crossing × Earthbound × SNES menu UI** — pixel-snapped, chunky, friendly.
+[`DESIGN.md`](./DESIGN.md) is canonical; every component derives from its tokens. The Munder Difflin
+brand layers a **Dunder-Mifflin maroon** (`#6E1423`) and **gold** (`#F4D35E`) on top for logo and
+chrome. The 15 avatars are the cast of *The Office*, differentiated by hair/skin/shirt recipes.
 
 ## Roadmap
 
-Pulled from [`SPEC.md`](./SPEC.md) §11 and the current mock boundary:
-
-- [ ] **Real event plane** — replace `mockEvents.ts` with Claude Code hooks so avatar movement reflects real tool use.
-- [ ] **Hook shim CLI** — a small Node binary installed into a project's `.claude/settings.local.json` that POSTs hook payloads to a local socket owned by the app.
-- [ ] **Add-agent flow** — pane/command picker + hook-install consent.
-- [ ] **Config drawer** — per-agent goal, model, permission mode, skills, MCP (spec'd in `DESIGN.md` §7.9).
-- [ ] **Notification round-trip** — approve/deny an agent's blocking prompt from the floor.
+- [ ] **Full real event plane** — every avatar move driven by Claude Code hook events.
+- [ ] **Add-agent flow** — command picker + per-project hook-install consent.
+- [ ] **Config drawer** — per-agent goal, model, permission mode, skills, MCP.
+- [ ] **Memory reflection** — summarize/bound per-agent `memory.md` over time.
 - [ ] **Persistence** — durable agents/layout/command history (SQLite).
 - [ ] **Packaging** — signed `.dmg`; revisit Linux/Windows later.
 
----
-
 ## Contributing
 
-Contributions are welcome — this is an early prototype, so there's a lot of surface area.
-
-1. Fork and create a feature branch.
-2. `npm install && npm run dev` to get a live build.
-3. Keep the type-checker green: `npm run typecheck`.
-4. Match the existing aesthetic — **any new UI must derive from [`DESIGN.md`](./DESIGN.md) tokens**, not ad-hoc colors or spacing.
-5. Open a PR describing the change and, for anything visual, include a screenshot or short clip.
-
-Good first areas: wiring real hook events, the add-agent flow, the config drawer, and cross-platform smoke-testing.
-
----
+Contributions are welcome — this is an early prototype with a lot of surface area. Start with
+[`CONTRIBUTING.md`](./CONTRIBUTING.md). The short version: fork, `npm install && npm run dev`, keep
+`npm run typecheck` green, and **derive any new UI from [`DESIGN.md`](./DESIGN.md) tokens**. Good
+first areas: wiring real hook events, the add-agent flow, the config drawer, and cross-platform work.
 
 ## License
 
 > [!IMPORTANT]
-> **Asset licensing:** the bundled pixel art (tilesets, maps, and the base character sheets that the Office cast is recolored from) comes from [LimeZu](https://limezu.itch.io/) via [`shahar061/the-office`](https://github.com/shahar061/the-office) and is distributed under the **LimeZu FREE VERSION license — non-commercial use only**. The recolored sprites are derivative edits and inherit that restriction. See [`src/renderer/src/assets/ATTRIBUTION.md`](./src/renderer/src/assets/ATTRIBUTION.md). **If you commercialize this project, you must replace these assets or obtain a paid LimeZu license.**
+> **Asset licensing.** The bundled pixel art (tilesets, maps, and the base character sheets the
+> Office cast is recolored from) comes from [LimeZu](https://limezu.itch.io/) via
+> [`shahar061/the-office`](https://github.com/shahar061/the-office) under the **LimeZu FREE VERSION
+> license — non-commercial use only**. The recolored sprites inherit that restriction. See
+> [`src/renderer/src/assets/ATTRIBUTION.md`](./src/renderer/src/assets/ATTRIBUTION.md). **To
+> commercialize, replace these assets or obtain a paid LimeZu license.**
 
-The **source code** is licensed under the **MIT License** — see [`LICENSE`](./LICENSE). The MIT grant covers the code only; the non-commercial asset restriction above is carved out from it in the `LICENSE` file's scope note.
-
----
+The **source code** is licensed under the **MIT License** — see [`LICENSE`](./LICENSE). The MIT grant
+covers the code only; the non-commercial asset restriction above is carved out in the `LICENSE` scope
+note. *Munder Difflin* is an affectionate parody and is not affiliated with NBC's *The Office* or
+Dunder Mifflin.
 
 ## Acknowledgements
 
 - [LimeZu](https://limezu.itch.io/) — pixel-art tilesets and character base sheets.
-- [`shahar061/the-office`](https://github.com/shahar061/the-office) — office tileset/map and walk-sheet vendoring (project code: ISC).
-- [Pixi.js](https://pixijs.com/), [xterm.js](https://xtermjs.org/), [node-pty](https://github.com/microsoft/node-pty), [electron-vite](https://electron-vite.org/), [CodeMirror](https://codemirror.net/) — the libraries this is built on.
+- [`shahar061/the-office`](https://github.com/shahar061/the-office) — office tileset/map vendoring.
+- [Pixi.js](https://pixijs.com/) · [xterm.js](https://xtermjs.org/) · [node-pty](https://github.com/microsoft/node-pty) · [electron-vite](https://electron-vite.org/) · [CodeMirror](https://codemirror.net/) — the libraries this is built on.
+- [Remotion](https://www.remotion.dev/) — the landing page's animated "how it works" clips (`landing-remotion/`).
+- *The Office* (US) — for Munder Difflin, Inc.

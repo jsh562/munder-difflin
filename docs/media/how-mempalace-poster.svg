@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="600" viewBox="0 0 960 600" role="img" aria-label="MemPalace — the shared semantic memory layer">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="40%" r="60%">
+      <stop offset="0" stop-color="#3a2356"/>
+      <stop offset="1" stop-color="#1A0A0E"/>
+    </radialGradient>
+    <style>
+      .px{font-family:"Press Start 2P",monospace;}
+      .mn{font-family:"VT323","DejaVu Sans Mono",monospace;}
+    </style>
+  </defs>
+  <rect width="960" height="600" fill="url(#glow)"/>
+  <rect x="16" y="16" width="928" height="568" fill="none" stroke="#4A0D17" stroke-width="6"/>
+
+  <!-- central palace -->
+  <g transform="translate(480 250)">
+    <rect x="-110" y="-90" width="220" height="180" fill="#2A1014" stroke="#B197FC" stroke-width="5"/>
+    <text x="0" y="-50" text-anchor="middle" class="px" font-size="14" fill="#F4D35E">MEMPALACE</text>
+    <!-- memory shelves -->
+    <g class="mn" font-size="18" fill="#D6C5FF" text-anchor="middle">
+      <rect x="-90" y="-30" width="180" height="22" fill="#1A1320" stroke="#6B5878" stroke-width="2"/><text x="0" y="-13">design tokens · maroon/gold</text>
+      <rect x="-90" y="2"  width="180" height="22" fill="#1A1320" stroke="#6B5878" stroke-width="2"/><text x="0" y="19">office cast = The Office</text>
+      <rect x="-90" y="34" width="180" height="22" fill="#1A1320" stroke="#6B5878" stroke-width="2"/><text x="0" y="51">hive: single-committer git</text>
+    </g>
+  </g>
+
+  <!-- agents around it, beams in -->
+  <g class="mn" font-size="18" fill="#1A1320" text-anchor="middle">
+    <g transform="translate(120 120)"><rect width="150" height="70" fill="#FFB4B4" stroke="#1A1320" stroke-width="4"/><text x="75" y="34">agent.coder</text><text x="75" y="56" font-size="15">writes memory.md</text></g>
+    <g transform="translate(690 120)"><rect width="150" height="70" fill="#A8E6E0" stroke="#1A1320" stroke-width="4"/><text x="75" y="34">agent.research</text><text x="75" y="56" font-size="15">mines its wing</text></g>
+    <g transform="translate(120 410)"><rect width="150" height="70" fill="#FFEC99" stroke="#1A1320" stroke-width="4"/><text x="75" y="34">agent.qa</text><text x="75" y="56" font-size="15">recall in 12ms</text></g>
+    <g transform="translate(690 410)"><rect width="150" height="70" fill="#B4E5BD" stroke="#1A1320" stroke-width="4"/><text x="75" y="34">GOD</text><text x="75" y="56" font-size="15">searches palace</text></g>
+  </g>
+
+  <!-- connecting beams -->
+  <g stroke="#B197FC" stroke-width="3" stroke-dasharray="6 6" opacity="0.8">
+    <line x1="270" y1="155" x2="380" y2="220"/>
+    <line x1="690" y1="155" x2="580" y2="220"/>
+    <line x1="270" y1="445" x2="380" y2="290"/>
+    <line x1="690" y1="445" x2="580" y2="290"/>
+  </g>
+
+  <g class="px" font-size="15" fill="#F4D35E"><text x="40" y="552">SHARED MEMORY · MILLISECOND RECALL</text></g>
+</svg>

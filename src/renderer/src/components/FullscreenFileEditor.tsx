@@ -54,7 +54,7 @@ export function FullscreenFileEditor() {
           color: 'var(--cth-ink-900)'
         }}
       >
-        CLAUDE TERMINAL HARNESS · FILE
+        MUNDER DIFFLIN · FILE
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>
         <CodeEditor

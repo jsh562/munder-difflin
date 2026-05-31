@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="600" viewBox="0 0 960 600" role="img" aria-label="The GOD agent orchestrating all agents through a hive mind">
+  <defs>
+    <style>
+      .px{font-family:"Press Start 2P",monospace;}
+      .mn{font-family:"VT323","DejaVu Sans Mono",monospace;}
+    </style>
+  </defs>
+  <rect width="960" height="600" fill="#1A0A0E"/>
+  <rect x="16" y="16" width="928" height="568" fill="none" stroke="#4A0D17" stroke-width="6"/>
+
+  <text x="40" y="64" class="px" font-size="15" fill="#F4D35E">YOU TALK TO ONE AGENT. IT RUNS THE FLOOR.</text>
+
+  <!-- you -->
+  <g transform="translate(60 120)">
+    <rect width="150" height="70" fill="#F4D35E" stroke="#4A0D17" stroke-width="5"/>
+    <text x="75" y="44" text-anchor="middle" class="px" font-size="14" fill="#1A0A0E">YOU</text>
+  </g>
+
+  <!-- GOD -->
+  <g transform="translate(380 110)">
+    <rect width="200" height="120" fill="#6E1423" stroke="#F4D35E" stroke-width="6"/>
+    <text x="100" y="48" text-anchor="middle" class="px" font-size="20" fill="#F4F1EA">GOD</text>
+    <text x="100" y="80" text-anchor="middle" class="mn" font-size="20" fill="#F4D35E">orchestrator</text>
+    <text x="100" y="104" text-anchor="middle" class="mn" font-size="17" fill="#E7E2D8">route · assign · escalate</text>
+  </g>
+
+  <!-- arrow you -> god -->
+  <g stroke="#F4D35E" stroke-width="4"><line x1="210" y1="155" x2="372" y2="165"/><path d="M372 165 l-16 -7 l0 14 z" fill="#F4D35E"/></g>
+
+  <!-- approvals queue (HITL) -->
+  <g transform="translate(700 120)">
+    <rect width="190" height="100" fill="#2A1014" stroke="#FF6B6B" stroke-width="4"/>
+    <text x="95" y="34" text-anchor="middle" class="mn" font-size="20" fill="#FFB4B4">approvals</text>
+    <text x="95" y="60" text-anchor="middle" class="mn" font-size="17" fill="#B9A9AC">only critical items</text>
+    <text x="95" y="84" text-anchor="middle" class="mn" font-size="17" fill="#B9A9AC">reach you</text>
+  </g>
+  <g stroke="#FF6B6B" stroke-width="4" stroke-dasharray="6 5"><line x1="580" y1="170" x2="700" y2="170"/></g>
+
+  <!-- hive bus -->
+  <rect x="60" y="300" width="830" height="44" fill="#2A1014" stroke="#4ECDC4" stroke-width="4"/>
+  <text x="475" y="329" text-anchor="middle" class="mn" font-size="22" fill="#A8E6E0">the hive · mailbox · blackboard · task ledger · event log</text>
+
+  <!-- god down to hive -->
+  <g stroke="#4ECDC4" stroke-width="4"><line x1="480" y1="230" x2="480" y2="300"/><path d="M480 300 l-7 -16 l14 0 z" fill="#4ECDC4"/></g>
+
+  <!-- worker agents -->
+  <g class="mn" font-size="19" fill="#1A1320" text-anchor="middle">
+    <g transform="translate(90 410)"><rect width="170" height="120" fill="#FFB4B4" stroke="#1A1320" stroke-width="4"/><text x="85" y="40">agent.coder</text><text x="85" y="68" font-size="16" fill="#3D2E4A">claude + memory</text><rect x="62" y="80" width="46" height="30" fill="#FF6B6B" stroke="#1A1320" stroke-width="3"/></g>
+    <g transform="translate(310 410)"><rect width="170" height="120" fill="#A8E6E0" stroke="#1A1320" stroke-width="4"/><text x="85" y="40">agent.research</text><text x="85" y="68" font-size="16" fill="#3D2E4A">claude + memory</text><rect x="62" y="80" width="46" height="30" fill="#4ECDC4" stroke="#1A1320" stroke-width="3"/></g>
+    <g transform="translate(530 410)"><rect width="170" height="120" fill="#FFEC99" stroke="#1A1320" stroke-width="4"/><text x="85" y="40">agent.qa</text><text x="85" y="68" font-size="16" fill="#3D2E4A">claude + memory</text><rect x="62" y="80" width="46" height="30" fill="#FFD93D" stroke="#1A1320" stroke-width="3"/></g>
+    <g transform="translate(750 410)"><rect width="140" height="120" fill="#D6C5FF" stroke="#1A1320" stroke-width="4"/><text x="70" y="40">agent.docs</text><text x="70" y="68" font-size="16" fill="#3D2E4A">claude + memory</text><rect x="47" y="80" width="46" height="30" fill="#B197FC" stroke="#1A1320" stroke-width="3"/></g>
+  </g>
+
+  <!-- hive down to agents -->
+  <g stroke="#4ECDC4" stroke-width="3" opacity="0.85">
+    <line x1="175" y1="344" x2="175" y2="410"/>
+    <line x1="395" y1="344" x2="395" y2="410"/>
+    <line x1="615" y1="344" x2="615" y2="410"/>
+    <line x1="820" y1="344" x2="820" y2="410"/>
+  </g>
+</svg>
