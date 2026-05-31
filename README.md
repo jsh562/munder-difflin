@@ -19,6 +19,13 @@ you talk to, and visualized as avatars at work on a shared office floor.
   <a href="./CONTRIBUTING.md"><img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-F4D35E.svg?style=flat-square&labelColor=6E1423"></a>
 </p>
 
+<br>
+
+<!-- Inline player renders on github.com (raw URL required; relative paths only link). -->
+<video src="https://github.com/chaitanyagiri/munder-difflin/raw/main/docs/media/hero.mp4" poster="https://github.com/chaitanyagiri/munder-difflin/raw/main/docs/media/hero-poster.svg" controls muted loop playsinline width="820">
+  <a href="https://github.com/chaitanyagiri/munder-difflin/raw/main/docs/media/hero.mp4">▶ Watch the floor — Munder Difflin running a hive of Claude Code agents</a>
+</video>
+
 </div>
 
 ---
