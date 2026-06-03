@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron';
 import { spawn } from 'node:child_process';
 import { rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -14,6 +14,7 @@ import {
 import { HiveManager, type AgentMeta, type HiveMessage } from './hive';
 import { HookServer } from './hooks';
 import { MemoryManager } from './memory';
+import { enrichMessage } from './assistant';
 
 const isDev = !!process.env.ELECTRON_RENDERER_URL;
 const ptyManager = new PtyManager();
@@ -127,6 +128,13 @@ ipcMain.handle('pty:kill', (_evt, id: string) => {
 });
 ipcMain.handle('pty:list', () => ptyManager.list());
 
+// ─── IPC: clipboard ─────────────────────────────────────────────────────────
+ipcMain.handle('app:copyToClipboard', (_evt, text: unknown) => {
+  if (typeof text !== 'string') return { ok: false, error: 'invalid text' };
+  try { clipboard.writeText(text); return { ok: true }; }
+  catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
+});
+
 // ─── IPC: folder picker ─────────────────────────────────────────────────────
 ipcMain.handle('dialog:chooseFolder', async (evt) => {
   const win = BrowserWindow.fromWebContents(evt.sender);
@@ -222,6 +230,28 @@ ipcMain.handle('hive:send', (_evt, partial: Partial<HiveMessage>, from: unknown)
   if (!hive.enabled()) return { ok: false, error: 'hive disabled (no harnessHome)' };
   const msg = hive.send(partial ?? {}, typeof from === 'string' ? from : 'system');
   return { ok: true, message: msg };
+});
+
+// ─── IPC: enrichment assistant (headless Sonnet 1M prompt prep) ─────────────
+ipcMain.handle('assistant:enrich', async (_evt, payload: unknown) => {
+  const p = (payload ?? {}) as { message?: unknown; cwd?: unknown };
+  if (typeof p.message !== 'string' || !p.message.trim()) {
+    return { ok: false, error: 'empty message' };
+  }
+  const cfg = readConfig();
+  const cwd = typeof p.cwd === 'string' && p.cwd ? p.cwd : cfg.harnessHome;
+  if (!cwd) return { ok: false, error: 'no working directory available' };
+  try {
+    return await enrichMessage({
+      message: p.message,
+      cwd,
+      repos: cfg.registeredRepos ?? [],
+      command: cfg.defaultCommand,
+      env: memory.env()
+    });
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
 });
 
 // ─── IPC: semantic memory (MemPalace CLI) ───────────────────────────────────

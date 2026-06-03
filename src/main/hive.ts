@@ -46,6 +46,9 @@ export interface AgentMeta {
   capabilities?: string[];
   cwd: string;
   isGod?: boolean;
+  /** Michael's prep assistant — enriches prompts and forwards them to Michael.
+   *  Send-only: excluded from broadcast fan-out so it never drains an inbox. */
+  isAssistant?: boolean;
 }
 
 export interface RegistryAgent extends AgentMeta {
@@ -281,6 +284,8 @@ export class HiveManager {
       : '';
     const godLine = meta.isGod
       ? 'You are the GOD / ORCHESTRATOR of this hive. Drain your inbox continually and triage every other agent\'s requests: answer clarifications and route work yourself so the team runs autonomously. ONLY escalate genuinely critical items — destructive actions, spending real money, scope changes, or unresolvable conflicts — to the human by sending a message with "to":"human" (or "needs_human":true); it queues for human approval and their reply returns to you. Keep the team unblocked, maintain registry/tasks awareness, and be the sole scribe of board.md.'
+      : meta.isAssistant
+      ? 'You are Michael\'s PREP ASSISTANT. You will be handed short, possibly vague instructions (each begins with "ENRICH TASK:"). For each one: (1) figure out which project it concerns and cd into the most relevant repo — you start in Michael\'s home directory; (2) gather concrete context READ-ONLY (exact file paths, current state, relevant code, conventions, active branch, gotchas) — NEVER modify, create, or delete files; (3) rewrite the instruction into ONE clear, self-contained prompt that Michael can execute autonomously, preserving the user\'s original intent without inventing scope. Then deliver it: write ONE message JSON into your outbox with "to":"god", "act":"request", a short subject, and the finished prompt as the body. Do NOT perform the task yourself — your only output is the improved prompt sent to Michael.'
       : 'For anything ambiguous, cross-cutting, or needing sign-off, address a message to "god".';
     return [
       `You are "${meta.name}" (${meta.id}), an autonomous agent in a collaborating hive of Claude agents.`,
@@ -348,7 +353,8 @@ export class HiveManager {
     }
     const reg = this.registry();
     const targets = msg.to === 'broadcast'
-      ? Object.keys(reg.agents).filter((a) => a !== msg.from)
+      // The prep assistant is send-only — never fan broadcasts into its inbox.
+      ? Object.keys(reg.agents).filter((a) => a !== msg.from && !reg.agents[a]?.isAssistant)
       : [msg.to === 'god' ? (reg.godId ?? 'god') : msg.to];
     for (const t of targets) this.deliver(msg, t);
     this.appendLog({ kind: 'message', from: msg.from, to: msg.to, act: msg.act, subject: msg.subject, id: msg.id });

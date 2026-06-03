@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { PixelBadge } from './PixelBadge';
 import { PixelButton } from './PixelButton';
 import { PtyTerminalView } from './PtyTerminalView';
+import { MessageQueueComposer } from './MessageQueueComposer';
+import { AssistantRoleNote } from './AssistantRoleNote';
 import { disposeTerminal } from './terminalPool';
 import { Icon } from './Icon';
 import { SpritePortrait } from './SpritePortrait';
@@ -128,15 +130,18 @@ export function FullscreenTerminal() {
       }}>
         <Header agent={agent} />
 
-        <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
-          <PtyTerminalView
-            key={agent.ptyId}
-            ptyId={agent.ptyId}
-            onStreamData={parser}
-            onUserPrompt={(t) => updateAgent(agent.id, { lastPrompt: t })}
-            onToggleFullscreen={() => setFullscreen(null)}
-            fullscreen
-          />
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+            <PtyTerminalView
+              key={agent.ptyId}
+              ptyId={agent.ptyId}
+              onStreamData={parser}
+              onUserPrompt={(t) => updateAgent(agent.id, { lastPrompt: t })}
+              onToggleFullscreen={() => setFullscreen(null)}
+              fullscreen
+            />
+          </div>
+          {agent.isAssistant ? <AssistantRoleNote /> : <MessageQueueComposer agent={agent} />}
         </div>
       </div>
     </div>

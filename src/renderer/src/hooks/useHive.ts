@@ -1,9 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { useStore, type Agent, type StationKind, type ToolKind } from '@/store/store';
-import { buildSpawnCommand, type HarnessConfig } from '@/store/config';
+import { buildSpawnCommand, ASSISTANT_MODEL, type HarnessConfig } from '@/store/config';
 
 const GOD_ID = 'god';
 const GOD_PTY = `pty-${GOD_ID}`;
+const ASSISTANT_ID = 'assistant';
+const ASSISTANT_PTY = `pty-${ASSISTANT_ID}`;
 
 /**
  * Type a line into an agent's Claude Code TUI and actually submit it.
@@ -18,6 +20,17 @@ async function submitToPty(ptyId: string, text: string): Promise<void> {
   await window.cth.writePty(ptyId, text);
   await new Promise((r) => setTimeout(r, 140));
   await window.cth.writePty(ptyId, '\r');
+}
+
+/** Wrap a user message as an enrich task for the assistant. The assistant's
+ *  system prompt has the full instructions; this just frames the one task. */
+function enrichTaskPrompt(text: string): string {
+  return [
+    `ENRICH TASK: ${text}`,
+    '',
+    '(Identify the relevant project, cd in, gather READ-ONLY context, then send the improved,',
+    'self-contained prompt to Michael via an outbox message with "to":"god". Do not do the task yourself.)'
+  ].join('\n');
 }
 
 /** Tool name → where the avatar walks + what it carries. */
@@ -41,7 +54,22 @@ const TOOL_STATION: Record<string, { station: StationKind; carry?: ToolKind }> =
  *      doesn't stall while an agent sits at its prompt.
  */
 export function useHive(config: HarnessConfig | null): void {
-  const nudged = useRef<Record<string, number>>({});
+  // Per-agent dedup key for the inbox-wake nudge: the newest inbox message id we
+  // last nudged about. Keyed by id (not count) so an oscillating count after a
+  // drain doesn't re-nudge for the same message set.
+  const nudged = useRef<Record<string, string>>({});
+  // Per-agent timestamp of the last queued-message we submitted. Guards against
+  // re-sending the next message before the agent's hooks have flipped it to
+  // 'working' (there's a short window where it still reads 'idle' right after we
+  // type into it). One message per cooldown keeps delivery strictly one-by-one.
+  const lastFlush = useRef<Record<string, number>>({});
+  // In-flight spawn guards so a re-render / StrictMode double-mount can't spawn
+  // Michael or the assistant twice (the window between the listPtys check and
+  // the spawnPty call is otherwise racy).
+  const godSpawning = useRef(false);
+  const assistantSpawning = useRef(false);
+  // Reactive so the assistant bootstrap (effect #1b) re-runs once Michael is ready.
+  const godStatus = useStore((s) => s.godStatus);
 
   // 1) Bootstrap the god agent (source of truth = live PTYs, to dodge restarts).
   useEffect(() => {
@@ -55,10 +83,12 @@ export function useHive(config: HarnessConfig | null): void {
         if (!cancelled) useStore.getState().setGodStatus('ready');
         return;
       }
-      if (cancelled) return;
+      // Synchronous guard (no await between check and set) → exactly one spawn.
+      if (cancelled || godSpawning.current) return;
+      godSpawning.current = true;
       useStore.getState().removeAgent(GOD_ID); // clear any stale restored entry
 
-      const command = buildSpawnCommand(config);
+      const command = buildSpawnCommand(config, config.defaultModel);
       const [exe, ...args] = command.trim().split(/\s+/);
       const res = await window.cth.spawnPty({
         id: GOD_PTY,
@@ -69,8 +99,8 @@ export function useHive(config: HarnessConfig | null): void {
         rows: 30,
         hive: { id: GOD_ID, name: 'Michael', cwd: config.harnessHome!, isGod: true, role: 'orchestrator (god)' }
       });
-      if (cancelled) return;
-      if (!res.ok) { useStore.getState().setGodStatus('failed'); return; }
+      if (cancelled) { godSpawning.current = false; return; }
+      if (!res.ok) { godSpawning.current = false; useStore.getState().setGodStatus('failed'); return; }
       const god: Agent = {
         id: GOD_ID,
         name: 'Michael',
@@ -86,6 +116,7 @@ export function useHive(config: HarnessConfig | null): void {
         currentStation: 'desk',
         ptyId: GOD_PTY,
         command: command.trim(),
+        model: config.defaultModel,
         isGod: true,
         recentTextTs: Date.now()
       };
@@ -94,6 +125,60 @@ export function useHive(config: HarnessConfig | null): void {
     }, 1200);
     return () => { cancelled = true; clearTimeout(t); };
   }, [config?.onboardingComplete, config?.harnessHome]);
+
+  // 1b) Bootstrap Michael's prep assistant ("Dwight") — only after Michael is
+  //     ready, and only once. Same live-PTY idempotency + spawn-guard as #1.
+  useEffect(() => {
+    if (!config?.onboardingComplete || !config.harnessHome) return;
+    if (godStatus !== 'ready') return;
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      if (cancelled) return;
+      const live = await window.cth.listPtys().catch(() => []);
+      if (live.some((p) => p.id === ASSISTANT_PTY)) return; // already running
+      if (cancelled || assistantSpawning.current) return;
+      assistantSpawning.current = true;
+      useStore.getState().removeAgent(ASSISTANT_ID); // clear any stale restored entry
+
+      const command = buildSpawnCommand(config, ASSISTANT_MODEL);
+      const [exe, ...args] = command.trim().split(/\s+/);
+      const res = await window.cth.spawnPty({
+        id: ASSISTANT_PTY,
+        cwd: config.harnessHome!,
+        command: exe,
+        args,
+        cols: 100,
+        rows: 30,
+        hive: { id: ASSISTANT_ID, name: 'Dwight', cwd: config.harnessHome!, isAssistant: true, role: "Michael's prep assistant" }
+      });
+      if (cancelled || !res.ok) { assistantSpawning.current = false; return; }
+      const assistant: Agent = {
+        id: ASSISTANT_ID,
+        name: 'Dwight',
+        character: 'dwight',
+        accent: 'sky',
+        description: "assistant — enriches prompts with repo context, forwards them to Michael",
+        project: 'hive',
+        tmuxTarget: '',
+        cwd: config.harnessHome!,
+        status: 'idle',
+        action: 'standing by',
+        progress: 0,
+        currentStation: 'desk',
+        ptyId: ASSISTANT_PTY,
+        command: command.trim(),
+        model: ASSISTANT_MODEL,
+        isAssistant: true,
+        recentTextTs: Date.now()
+      };
+      // addAgent auto-selects the new agent; restore the prior selection so the
+      // assistant booting in the background doesn't yank focus off Michael.
+      const prevSel = useStore.getState().selectedId;
+      useStore.getState().addAgent(assistant);
+      useStore.getState().select(prevSel ?? GOD_ID);
+    }, 400);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [config?.onboardingComplete, config?.harnessHome, godStatus]);
 
   // 2) Drive avatars from real hook events emitted by each agent's shim.
   useEffect(() => {
@@ -107,12 +192,19 @@ export function useHive(config: HarnessConfig | null): void {
       if (e.event === 'PreToolUse' && e.tool) {
         const m = TOOL_STATION[e.tool] ?? { station: 'desk' as StationKind };
         updateAgent(e.agentId, { status: 'working', currentStation: m.station, carrying: m.carry, action: `using ${e.tool}` });
+        useStore.getState().bumpToolCount(e.agentId); // usage proxy for the command center
       } else if (e.event === 'PostToolUse' || e.event === 'UserPromptSubmit') {
         // A turn is in progress (prompt submitted / tool just finished) — keep
         // it working so it doesn't flicker idle between tool calls.
         updateAgent(e.agentId, { status: 'working' });
       } else if (e.event === 'Stop' || e.event === 'SubagentStop') {
-        updateAgent(e.agentId, { status: 'idle', action: 'idle', carrying: undefined });
+        // A blocked Stop means the agent is being re-engaged to process its
+        // inbox — it's NOT idle, so keep it working until it genuinely stops.
+        if (e.blocked) {
+          updateAgent(e.agentId, { status: 'working', action: 'reading inbox', carrying: undefined });
+        } else {
+          updateAgent(e.agentId, { status: 'idle', action: 'idle', carrying: undefined });
+        }
       } else if (e.event === 'Notification') {
         // Claude Code fires Notification for two very different situations:
         //   1. it genuinely needs the human (a permission / approval prompt), or
@@ -142,28 +234,92 @@ export function useHive(config: HarnessConfig | null): void {
     });
   }, []);
 
-  // 3) Wake idle agents holding unread inbox messages.
+  // 3) Wake idle agents holding unread inbox messages. The assistant is
+  //    send-only (it never receives inbox mail), so it's excluded.
   useEffect(() => {
     if (!config?.onboardingComplete) return;
     const iv = setInterval(async () => {
       const agents = useStore.getState().agents.filter(
-        (a) => a.ptyId && (a.status === 'idle' || a.status === 'waiting')
+        (a) => a.ptyId && !a.isAssistant && (a.status === 'idle' || a.status === 'waiting')
       );
       for (const a of agents) {
         try {
-          const count = (await window.cth.hiveInbox(a.id)).length;
-          if (count > 0 && nudged.current[a.id] !== count) {
-            nudged.current[a.id] = count;
+          const inbox = await window.cth.hiveInbox(a.id);
+          // Dedup by the newest message id, not the count — a count can oscillate
+          // as messages drain and re-arrive, which would re-nudge for the same set.
+          const newest = inbox.length
+            ? inbox.map((m) => m.id).sort().slice(-1)[0]
+            : '';
+          if (newest && nudged.current[a.id] !== newest) {
+            nudged.current[a.id] = newest;
             await submitToPty(
               a.ptyId!,
               'You have new hive inbox message(s) — read your inbox, act on them now, and move handled ones to inbox/.done/. Act autonomously; only message god if you genuinely need a decision.'
             );
-          } else if (count === 0) {
-            nudged.current[a.id] = 0;
+          } else if (!newest) {
+            nudged.current[a.id] = '';
           }
         } catch { /* ignore */ }
       }
     }, 4000);
     return () => clearInterval(iv);
+  }, [config?.onboardingComplete]);
+
+  // 4) Drain each agent's queued messages to its terminal, one at a time, the
+  //    moment the agent goes idle. This is what lets the user keep sending
+  //    messages while the agent's "cloud terminal" is mid-run: the messages
+  //    park in the store and get typed in (and submitted) as soon as it's free.
+  useEffect(() => {
+    if (!config?.onboardingComplete) return;
+    const FLUSH_COOLDOWN_MS = 4500;
+
+    // Send the front of `srcId`'s queue into `target`'s pty (verbatim or wrapped),
+    // gated on the target being idle + off cooldown. Keyed cooldown per target so
+    // strict one-by-one delivery holds. Returns true if it dispatched.
+    const dispatch = (srcId: string, target: Agent | undefined, wrap?: (t: string) => string): boolean => {
+      const { messageQueues, removeQueuedMessage } = useStore.getState();
+      const next = messageQueues[srcId]?.[0];
+      if (!next || !target?.ptyId || target.status !== 'idle') return false;
+      const now = Date.now();
+      if (now - (lastFlush.current[target.id] ?? 0) < FLUSH_COOLDOWN_MS) return false;
+      lastFlush.current[target.id] = now;
+      // Remove first so a burst of store updates can't double-send the same one.
+      removeQueuedMessage(srcId, next.id);
+      submitToPty(target.ptyId, wrap ? wrap(next.text) : next.text).catch(() => { /* pty may have died */ });
+      return true;
+    };
+
+    const flush = () => {
+      const { agents, messageQueues, enrichEnabled } = useStore.getState();
+      const byId = (id: string) => agents.find((a) => a.id === id);
+
+      // Sub-agents (and the assistant's own direct queue): flush verbatim into
+      // their own terminal. Michael's queue is handled specially below.
+      for (const a of agents) {
+        if (a.id === GOD_ID) continue;
+        if (!a.ptyId || a.status !== 'idle') continue;
+        if (!messageQueues[a.id]?.length) continue;
+        dispatch(a.id, a);
+      }
+
+      // Michael's queue: enrich OFF → straight to Michael; enrich ON → wrap as an
+      // ENRICH TASK and route to the assistant, which forwards to Michael's inbox.
+      if (messageQueues[GOD_ID]?.length) {
+        if (enrichEnabled) dispatch(GOD_ID, byId(ASSISTANT_ID), enrichTaskPrompt);
+        else dispatch(GOD_ID, byId(GOD_ID));
+      }
+    };
+
+    // Run on every store change (status flips, new queue items) — debounced so a
+    // burst of pty-stream updates coalesces — plus a periodic backstop.
+    let debounce: ReturnType<typeof setTimeout> | null = null;
+    const schedule = () => {
+      if (debounce) return;
+      debounce = setTimeout(() => { debounce = null; flush(); }, 200);
+    };
+    const unsub = useStore.subscribe(schedule);
+    const iv = setInterval(flush, 3000);
+    schedule();
+    return () => { unsub(); if (debounce) clearTimeout(debounce); clearInterval(iv); };
   }, [config?.onboardingComplete]);
 }

@@ -7,6 +7,7 @@ export interface HiveAgentMeta {
   capabilities?: string[];
   cwd: string;
   isGod?: boolean;
+  isAssistant?: boolean;
 }
 
 export interface HiveMessage {
@@ -61,6 +62,7 @@ export interface HarnessConfig {
   registeredRepos: string[];
   autoMode: boolean;
   defaultCommand: string;
+  defaultModel?: string;
   semanticMemory: boolean;
   embeddingModel: 'minilm' | 'embeddinggemma';
 }
@@ -129,6 +131,10 @@ const api = {
   openTerminalAt: (cwd: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('terminal:openAtFolder', cwd),
 
+  // ─── Clipboard ─────────────────────────────────────────────────────────────
+  copyToClipboard: (text: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('app:copyToClipboard', text),
+
   // ─── Config ──────────────────────────────────────────────────────────────
   getConfig: (): Promise<HarnessConfig> =>
     ipcRenderer.invoke('config:get'),
@@ -181,10 +187,17 @@ const api = {
   mineNow: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('hive:mineNow'),
   hiveSend: (msg: Partial<HiveMessage>, from?: string): Promise<{ ok: boolean; error?: string; message?: HiveMessage }> =>
     ipcRenderer.invoke('hive:send', msg, from),
+
+  // ─── Enrichment assistant (headless Sonnet 1M prompt prep for Michael) ─────
+  /** Run Michael's silent assistant on a raw message and return an enriched,
+   *  context-rich prompt. `cwd` is the agent's working directory (its default
+   *  context); the assistant may read every registered repo to gather more. */
+  enrichMessage: (req: { message: string; cwd: string }): Promise<{ ok: boolean; prompt?: string; error?: string }> =>
+    ipcRenderer.invoke('assistant:enrich', req),
   onHiveHookEvent: (
-    cb: (e: { agentId?: string; event: string; tool?: string; notificationType?: string; source?: string; message?: string }) => void
+    cb: (e: { agentId?: string; event: string; tool?: string; notificationType?: string; source?: string; message?: string; blocked?: boolean }) => void
   ): (() => void) => {
-    const listener = (_e: IpcRendererEvent, payload: { agentId?: string; event: string; tool?: string; notificationType?: string; source?: string; message?: string }) => cb(payload);
+    const listener = (_e: IpcRendererEvent, payload: { agentId?: string; event: string; tool?: string; notificationType?: string; source?: string; message?: string; blocked?: boolean }) => cb(payload);
     ipcRenderer.on('hive:hookEvent', listener);
     return () => ipcRenderer.removeListener('hive:hookEvent', listener);
   },

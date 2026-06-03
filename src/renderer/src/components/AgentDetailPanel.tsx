@@ -4,6 +4,9 @@ import { PixelBadge } from './PixelBadge';
 import { PixelButton } from './PixelButton';
 import { SpritePortrait } from './SpritePortrait';
 import { PtyTerminalView } from './PtyTerminalView';
+import { MessageQueueComposer } from './MessageQueueComposer';
+import { AssistantRoleNote } from './AssistantRoleNote';
+import { CommandCenterPanel } from './CommandCenterPanel';
 import { disposeTerminal } from './terminalPool';
 import { SidebarTabs } from './SidebarTabs';
 import { FilesTab } from './FilesTab';
@@ -33,6 +36,9 @@ export function AgentDetailPanel({ agent }: AgentDetailPanelProps) {
   const isFullscreenedHere = fullscreenAgentId === agent.id;
 
   const onPtyStream = usePtyParser(agent.id);
+
+  // Michael gets the full command-center dashboard instead of the plain panel.
+  if (agent.isGod) return <CommandCenterPanel agent={agent} />;
 
   const openTerminal = async () => {
     setOpenTerminalState('opening');
@@ -142,15 +148,20 @@ export function AgentDetailPanel({ agent }: AgentDetailPanelProps) {
                 This terminal is open in fullscreen. Press Esc or exit fullscreen to bring it back here.
               </EmptyTab>
             ) : (
-            <PtyTerminalView
-              key={agent.ptyId}
-              ptyId={agent.ptyId}
-              onStreamData={onPtyStream}
-              onUserPrompt={(t) => updateAgent(agent.id, { lastPrompt: t })}
-              onToggleFullscreen={() => setFullscreen(agent.id)}
-              fullscreen={false}
-              embedded
-            />
+            <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+                <PtyTerminalView
+                  key={agent.ptyId}
+                  ptyId={agent.ptyId}
+                  onStreamData={onPtyStream}
+                  onUserPrompt={(t) => updateAgent(agent.id, { lastPrompt: t })}
+                  onToggleFullscreen={() => setFullscreen(agent.id)}
+                  fullscreen={false}
+                  embedded
+                />
+              </div>
+              {agent.isAssistant ? <AssistantRoleNote /> : <MessageQueueComposer agent={agent} />}
+            </div>
             )
           ) : (
             <EmptyTab title="No PTY">

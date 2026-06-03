@@ -13,12 +13,19 @@ export interface AgentCardProps {
   action?: string;
   progress?: number; // 0..8 segments filled
   selected?: boolean;
+  /** The orchestrator — gets a persistent accent frame + GOD tag so it stands out. */
+  isGod?: boolean;
+  /** The prep assistant. Same size as every other card (no special sizing). */
+  isAssistant?: boolean;
   onClick?: () => void;
 }
 
 export function AgentCard({
-  name, character, accent, status, project, action, progress = 0, selected, onClick
+  name, character, accent, status, project, action, progress = 0, selected, isGod, onClick
 }: AgentCardProps) {
+  // The god is always framed (stands out from the row); others only when selected.
+  const framed = isGod || selected;
+
   return (
     <button
       onClick={onClick}
@@ -29,8 +36,8 @@ export function AgentCard({
       }}
     >
       <PixelPanel
-        variant={selected ? 'active' : 'default'}
-        accent={selected ? accent : undefined}
+        variant={framed ? 'active' : 'default'}
+        accent={framed ? accent : undefined}
         style={{ height: '100%', padding: 8 }}
         noPadding
       >
@@ -39,7 +46,8 @@ export function AgentCard({
             width: 44, height: 64,
             background: `var(--cth-${accent}-light)`,
             boxShadow: 'inset 0 0 0 1px var(--cth-ink-900)',
-            display: 'flex', alignItems: 'flex-end', justifyContent: 'center', overflow: 'hidden'
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'center', overflow: 'hidden',
+            flexShrink: 0
           }}>
             <SpritePortrait character={character} scale={2} />
           </div>
@@ -56,14 +64,24 @@ export function AgentCard({
               }}>{name.toUpperCase()}</span>
               <PixelBadge status={status} />
             </div>
+
             <div style={{
+              display: 'flex', alignItems: 'center', gap: 5,
               fontSize: 'var(--cth-text-body-sm)',
               lineHeight: '16px',
               color: 'var(--cth-ink-500)',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            }}>{project}</div>
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+            }}>
+              {isGod && (
+                <span style={{
+                  fontFamily: 'var(--cth-font-display)', fontSize: 8, lineHeight: '12px',
+                  background: `var(--cth-${accent})`, color: 'var(--cth-ink-900)',
+                  padding: '1px 5px 0', boxShadow: 'inset 0 0 0 1px var(--cth-ink-900)', flexShrink: 0
+                }}>GOD</span>
+              )}
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{project}</span>
+            </div>
+
             <div style={{
               fontSize: 'var(--cth-text-body-sm)',
               lineHeight: '16px',
@@ -71,7 +89,9 @@ export function AgentCard({
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis'
-            }}>{action ?? ' '}</div>
+            }}>{/* The "idle" badge already conveys idle — don't echo "awaiting". */
+              (status === 'idle' ? '' : action) || ' '}</div>
+
             <div style={{ display: 'flex', gap: 2, marginTop: 2 }}>
               {Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} style={{

@@ -6,7 +6,7 @@ import { Icon } from './Icon';
 import { useStore, type Agent } from '@/store/store';
 import { OFFICE_CAST, DEFAULT_CHARACTER, type OfficeCharacterName } from '@/scene/office/cast';
 import { type AccentColorName } from '@/design/tokens';
-import { type HarnessConfig, buildSpawnCommand } from '@/store/config';
+import { type HarnessConfig, buildSpawnCommand, AGENT_MODELS } from '@/store/config';
 
 const ACCENTS: AccentColorName[] = ['coral', 'mint', 'sky', 'lemon', 'lilac', 'peach'];
 
@@ -30,8 +30,16 @@ export function AddAgentModal({ onClose, config }: AddAgentModalProps) {
   const [character, setCharacter] = useState<OfficeCharacterName>(DEFAULT_CHARACTER);
   const [accent, setAccent] = useState<AccentColorName>('sky');
   const [cwd, setCwd] = useState<string>(config.registeredRepos[0] ?? '');
-  const [command, setCommand] = useState(buildSpawnCommand(config));
+  const [model, setModel] = useState<string | undefined>(config.defaultModel);
+  const [command, setCommand] = useState(buildSpawnCommand(config, config.defaultModel));
   const [description, setDescription] = useState('a fresh harness');
+
+  // Picking a model rebuilds the command; the command field stays editable for
+  // power users (it's the source of truth for the actual spawn).
+  const pickModel = (id?: string) => {
+    setModel(id);
+    setCommand(buildSpawnCommand(config, id));
+  };
   const [goal, setGoal] = useState('');
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
@@ -92,6 +100,7 @@ export function AddAgentModal({ onClose, config }: AddAgentModalProps) {
       currentStation: 'desk',
       ptyId,
       command: command.trim(),
+      model,
       recentTextTs: Date.now()
     };
     addAgent(agent);
@@ -163,6 +172,32 @@ export function AddAgentModal({ onClose, config }: AddAgentModalProps) {
                     <Icon name="folder" /> pick
                   </span>
                 </PixelButton>
+              </div>
+            </Row>
+
+            <Row label="Model">
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {AGENT_MODELS.map((m) => {
+                  const active = (model ?? '') === (m.id ?? '');
+                  return (
+                    <button
+                      key={m.label}
+                      onClick={() => pickModel(m.id)}
+                      title={m.id ?? 'CLI default model'}
+                      style={{
+                        padding: '3px 8px 1px',
+                        background: active ? `var(--cth-${accent}-light)` : 'var(--cth-cream-100)',
+                        boxShadow: active
+                          ? 'inset 0 0 0 2px var(--cth-ink-900)'
+                          : 'inset 0 0 0 1px var(--cth-ink-700)',
+                        fontFamily: 'var(--cth-font-ui)', fontSize: 13,
+                        color: 'var(--cth-ink-900)', cursor: 'pointer', border: 'none'
+                      }}
+                    >
+                      {m.label}
+                    </button>
+                  );
+                })}
               </div>
             </Row>
 

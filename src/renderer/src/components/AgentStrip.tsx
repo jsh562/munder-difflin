@@ -33,6 +33,8 @@ export function AgentStrip() {
           action={a.action}
           progress={a.progress}
           selected={a.id === selectedId}
+          isGod={a.isGod}
+          isAssistant={a.isAssistant}
           onClick={() => select(a.id)}
         />
       ))}

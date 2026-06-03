@@ -141,23 +141,30 @@ export function PtyTerminalView({ ptyId, onStreamData, onUserPrompt, onToggleFul
     entry.onData = (chunk) => onStreamDataRef.current?.(chunk);
     entry.onPrompt = (text) => onUserPromptRef.current?.(text);
 
-    const tryFit = () => {
+    // `scrollToEnd` is true only for the initial attach (switching agents /
+    // toggling fullscreen) so we land on the most recent output. Re-parenting
+    // the pooled terminal resets its viewport to the top otherwise. Later
+    // resize-driven fits pass false so they don't yank a user who has scrolled
+    // up to read history back down to the bottom.
+    const tryFit = (scrollToEnd = false) => {
       try {
         entry.fit.fit();
         window.cth.resizePty(ptyId, entry.term.cols, entry.term.rows);
         entry.term.refresh(0, Math.max(0, entry.term.rows - 1));
+        if (scrollToEnd) entry.term.scrollToBottom();
       } catch { /* host may not be sized yet */ }
     };
-    // Fit once layout has settled and again once the web font has loaded.
-    requestAnimationFrame(() => requestAnimationFrame(tryFit));
-    const retries = [setTimeout(tryFit, 60), setTimeout(tryFit, 240)];
+    // Fit once layout has settled and again once the web font has loaded —
+    // these are the initial-attach fits, so snap to the bottom.
+    requestAnimationFrame(() => requestAnimationFrame(() => tryFit(true)));
+    const retries = [setTimeout(() => tryFit(true), 60), setTimeout(() => tryFit(true), 240)];
     if (typeof document !== 'undefined' && document.fonts?.ready) {
-      document.fonts.ready.then(tryFit).catch(() => { /* noop */ });
+      document.fonts.ready.then(() => tryFit(true)).catch(() => { /* noop */ });
     }
 
-    const ro = new ResizeObserver(tryFit);
+    const ro = new ResizeObserver(() => tryFit(false));
     ro.observe(container);
-    const onWinResize = () => tryFit();
+    const onWinResize = () => tryFit(false);
     window.addEventListener('resize', onWinResize);
 
     return () => {

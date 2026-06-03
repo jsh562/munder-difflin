@@ -50,16 +50,33 @@ export interface Agent {
   ptyId?: string;
   /** the command being run in the PTY (e.g. 'claude') */
   command?: string;
+  /** the model this agent runs on (e.g. 'claude-sonnet-4-6[1m]'); drives the
+   *  model selector + the --model arg used when (re)spawning the agent */
+  model?: string;
   /** the last prompt the user submitted to this agent in Claude Code —
    *  shown on the floor as a card above the seated avatar */
   lastPrompt?: string;
   /** the orchestrator ("god") agent — seated in Michael's room, runs the floor */
   isGod?: boolean;
+  /** Michael's prep assistant ("Dwight") — enriches prompts and forwards them to
+   *  Michael via the hive. Send-only: never receives inbox/broadcast mail. */
+  isAssistant?: boolean;
 }
 
 export interface FeedEntry {
   agentId: string;
   text: string;
+  ts: number;
+}
+
+/** A message the user has parked for an agent while its terminal was busy.
+ *  Queued messages are drained one at a time when the agent next goes idle (see
+ *  useHive's flush loop). For Michael's queue the enrich toggle decides whether
+ *  each one is typed into Michael directly or routed through the assistant. */
+export interface QueuedMessage {
+  id: string;
+  text: string;
+  /** epoch ms the message was queued — drives ordering and the "queued 2m ago" hint */
   ts: number;
 }
 
@@ -81,12 +98,31 @@ interface State {
   sidebarWidth: number;
   sidebarTab: SidebarTab;
   godStatus: GodStatus;
+  /** Per-agent outgoing message queue (agent id → messages awaiting delivery).
+   *  Lets the user keep "talking" to a busy agent: messages park here and are
+   *  drained to the terminal one-by-one once the agent is free. */
+  messageQueues: Record<string, QueuedMessage[]>;
+  /** Global toggle: when on, messages queued for Michael are routed through the
+   *  assistant ("Dwight") to be enriched with context before reaching Michael;
+   *  when off, they're typed straight into Michael. */
+  enrichEnabled: boolean;
+  setEnrichEnabled: (on: boolean) => void;
+  /** Per-agent tool-call count this session — a lightweight activity/usage proxy
+   *  shown in the command center (interactive sessions don't expose billed $). */
+  toolCounts: Record<string, number>;
+  bumpToolCount: (id: string) => void;
   setGodStatus: (status: GodStatus) => void;
   select: (id: string) => void;
   updateAgent: (id: string, patch: Partial<Agent>) => void;
   pushFeed: (id: string, line: string) => void;
   addAgent: (agent: Agent) => void;
   removeAgent: (id: string) => void;
+  /** Park a message for an agent. Returns nothing; the flush loop delivers it. */
+  enqueueMessage: (agentId: string, text: string) => void;
+  /** Drop a single queued message (user removed it, or it was just delivered). */
+  removeQueuedMessage: (agentId: string, messageId: string) => void;
+  /** Clear an agent's entire pending queue. */
+  clearQueue: (agentId: string) => void;
   setAddAgentOpen: (open: boolean) => void;
   setFullscreen: (id: string | null) => void;
   setFullscreenFile: (path: string | null) => void;
@@ -102,6 +138,8 @@ const LS_SIDEBAR_WIDTH = 'cth.sidebarWidth';
 const LS_SIDEBAR_TAB = 'cth.sidebarTab';
 const LS_AGENTS = 'cth.agents';
 const LS_SELECTED = 'cth.selectedId';
+const LS_QUEUES = 'cth.messageQueues';
+const LS_ENRICH = 'cth.enrichEnabled';
 
 // Fields that are large or transient — not worth persisting across reloads.
 type PersistedAgent = Omit<Agent, 'recentAssistantText' | 'recentTextTs' | 'blockReason'>;
@@ -137,6 +175,34 @@ function loadPersistedAgents(): Agent[] {
   }
 }
 
+function persistQueues(queues: Record<string, QueuedMessage[]>): void {
+  try {
+    // Only keep non-empty queues so the key stays small.
+    const slim: Record<string, QueuedMessage[]> = {};
+    for (const [id, q] of Object.entries(queues)) if (q.length) slim[id] = q;
+    window.localStorage.setItem(LS_QUEUES, JSON.stringify(slim));
+  } catch { /* noop */ }
+}
+
+function loadPersistedQueues(): Record<string, QueuedMessage[]> {
+  try {
+    const raw = window.localStorage.getItem(LS_QUEUES);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, QueuedMessage[]>;
+    if (!parsed || typeof parsed !== 'object') return {};
+    // Defensively keep only well-formed entries.
+    const out: Record<string, QueuedMessage[]> = {};
+    for (const [id, q] of Object.entries(parsed)) {
+      if (Array.isArray(q)) {
+        out[id] = q.filter((m) => m && typeof m.text === 'string' && typeof m.id === 'string');
+      }
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
 function loadPersistedSelectedId(agents: Agent[]): string | null {
   try {
     const id = window.localStorage.getItem(LS_SELECTED);
@@ -163,6 +229,18 @@ const initialSidebarTab: SidebarTab = (() => {
 
 const initialAgents = loadPersistedAgents();
 const initialSelectedId = loadPersistedSelectedId(initialAgents);
+const initialQueues = loadPersistedQueues();
+const initialEnrichEnabled: boolean = (() => {
+  try { return window.localStorage.getItem(LS_ENRICH) === '1'; } catch { return false; }
+})();
+
+let queuedSeq = 0;
+/** Process-unique id for a queued message (timestamp + counter avoids collisions
+ *  when several are queued within the same millisecond). */
+function newQueuedId(): string {
+  queuedSeq += 1;
+  return `q-${Date.now()}-${queuedSeq}`;
+}
 
 export const useStore = create<State>((set) => ({
   agents: initialAgents,
@@ -174,6 +252,15 @@ export const useStore = create<State>((set) => ({
   sidebarWidth: initialSidebarWidth,
   sidebarTab: initialSidebarTab,
   godStatus: 'booting',
+  messageQueues: initialQueues,
+  enrichEnabled: initialEnrichEnabled,
+  setEnrichEnabled: (on) => {
+    try { window.localStorage.setItem(LS_ENRICH, on ? '1' : '0'); } catch { /* noop */ }
+    set({ enrichEnabled: on });
+  },
+  toolCounts: {},
+  bumpToolCount: (id) =>
+    set((s) => ({ toolCounts: { ...s.toolCounts, [id]: (s.toolCounts[id] ?? 0) + 1 } })),
   setGodStatus: (status) => set({ godStatus: status }),
   select: (id) => set((s) => { persistAgents(s.agents, id); return { selectedId: id }; }),
   updateAgent: (id, patch) =>
@@ -194,9 +281,36 @@ export const useStore = create<State>((set) => ({
     set((s) => {
       const agents = s.agents.filter(a => a.id !== id);
       const { [id]: _gone, ...feeds } = s.feeds;
+      const { [id]: _queueGone, ...messageQueues } = s.messageQueues;
       const selectedId = s.selectedId === id ? (agents[0]?.id ?? null) : s.selectedId;
       persistAgents(agents, selectedId);
-      return { agents, feeds, selectedId };
+      if (_queueGone) persistQueues(messageQueues);
+      return { agents, feeds, selectedId, messageQueues };
+    }),
+  enqueueMessage: (agentId, text) =>
+    set((s) => {
+      const trimmed = text.trim();
+      if (!trimmed) return s;
+      const msg: QueuedMessage = { id: newQueuedId(), text: trimmed, ts: Date.now() };
+      const messageQueues = { ...s.messageQueues, [agentId]: [...(s.messageQueues[agentId] ?? []), msg] };
+      persistQueues(messageQueues);
+      return { messageQueues };
+    }),
+  removeQueuedMessage: (agentId, messageId) =>
+    set((s) => {
+      const current = s.messageQueues[agentId];
+      if (!current) return s;
+      const next = current.filter((m) => m.id !== messageId);
+      const messageQueues = { ...s.messageQueues, [agentId]: next };
+      persistQueues(messageQueues);
+      return { messageQueues };
+    }),
+  clearQueue: (agentId) =>
+    set((s) => {
+      if (!s.messageQueues[agentId]?.length) return s;
+      const messageQueues = { ...s.messageQueues, [agentId]: [] };
+      persistQueues(messageQueues);
+      return { messageQueues };
     }),
   reconcileWithLivePtys: (livePtyIds) =>
     set((s) => {

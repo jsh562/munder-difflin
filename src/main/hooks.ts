@@ -75,30 +75,37 @@ export class HookServer {
     const agentId = p.agent_id ?? undefined;
     const event = p.hook_event_name ?? 'Unknown';
 
-    // Forward everything to the renderer so avatars reflect real activity.
-    this.emit(agentId, event, p);
-
     if ((event === 'Stop' || event === 'SubagentStop') && agentId) {
       // Loop guard: a previous Stop hook already blocked this turn → let it stop.
-      if (p.stop_hook_active) return {};
+      if (p.stop_hook_active) { this.emit(agentId, event, p); return {}; }
       const drain = this.hive.drainForStop(agentId);
       if (drain.block) {
+        // The agent is NOT idle — we're forcing it to keep working to process
+        // its inbox. Tell the renderer that (blocked: true) so it doesn't flash
+        // 'idle' on a Stop that never actually stops. Without this, an agent
+        // re-engaged by a queued/dispatched message reads as idle while working.
+        this.emit(agentId, event, p, true);
         return { decision: 'block', reason: drain.reason };
       }
+      // A genuine stop with nothing queued → idle.
+      this.emit(agentId, event, p);
       return {};
     }
 
+    // Forward everything else to the renderer so avatars reflect real activity.
+    this.emit(agentId, event, p);
     return {};
   }
 
-  private emit(agentId: string | undefined, event: string, p: HookPayload): void {
+  private emit(agentId: string | undefined, event: string, p: HookPayload, blocked = false): void {
     this.getWebContents()?.send('hive:hookEvent', {
       agentId,
       event,
       tool: p.tool_name,
       notificationType: p.notification_type,
       source: p.source,
-      message: p.message
+      message: p.message,
+      blocked
     });
   }
 }

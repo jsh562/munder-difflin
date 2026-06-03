@@ -13,6 +13,8 @@ export interface HarnessConfig {
   autoMode: boolean;
   /** The command we run when spawning a new agent. */
   defaultCommand: string;
+  /** Default model for newly spawned agents (e.g. 'claude-sonnet-4-6[1m]'); unset = CLI default. */
+  defaultModel?: string;
   /** Enable semantic memory (MemPalace CLI). No-op if mempalace isn't installed. */
   semanticMemory: boolean;
   /** Embedding model for the palace: lightweight 'minilm' or multilingual 'embeddinggemma'. */

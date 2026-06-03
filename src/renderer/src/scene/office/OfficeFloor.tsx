@@ -217,12 +217,16 @@ export function OfficeFloor() {
       if (waitTiles.length === 0) waitTiles.push(entrance);
 
       // Seat 0 is desk-ceo — "Michael's room" — reserved for the god agent.
-      // Everyone else claims from seat 1 onward so the corner office stays the
-      // orchestrator's throne even if it spawns after other agents.
+      // Seat 1 is reserved for his prep assistant ("Dwight") so it always sits in
+      // the desk next to him. Everyone else claims from seat 2 onward.
       const GOD_SEAT = 0;
+      const ASSISTANT_SEAT = 1;
       const claimSeat = (agent: Agent): number | null => {
         if (agent.isGod) { seatClaims.add(GOD_SEAT); return GOD_SEAT; }
-        for (let i = 1; i < seatTiles.length; i++) {
+        if (agent.isAssistant && seatTiles.length > ASSISTANT_SEAT) {
+          seatClaims.add(ASSISTANT_SEAT); return ASSISTANT_SEAT;
+        }
+        for (let i = 2; i < seatTiles.length; i++) {
           if (!seatClaims.has(i)) { seatClaims.add(i); return i; }
         }
         return null;
