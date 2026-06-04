@@ -18,6 +18,16 @@ import { buildSpawnCommand, AGENT_MODELS } from '@/store/config';
 
 type CCTab = 'terminal' | 'floor' | 'memory' | 'activity' | 'handbook';
 
+/** A GitHub issue as returned by `window.cth.githubIssues` (labels/assignees flattened). */
+interface GHIssue {
+  number: number;
+  title: string;
+  body: string;
+  url: string;
+  labels: string[];
+  assignees: string[];
+}
+
 const TABS: { key: CCTab; label: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
   { key: 'terminal', label: 'terminal', icon: 'terminal' },
   { key: 'floor', label: 'floor', icon: 'mcp' },
@@ -136,6 +146,11 @@ function FloorTab() {
   const [dispatchTo, setDispatchTo] = useState<string>('broadcast');
   const [dispatchText, setDispatchText] = useState('');
   const [dispatchMsg, setDispatchMsg] = useState<string | null>(null);
+  // ── ISSUES section state ──
+  const [issueRepo, setIssueRepo] = useState<string>('');
+  const [issues, setIssues] = useState<GHIssue[]>([]);
+  const [issuesLoading, setIssuesLoading] = useState(false);
+  const [issuesError, setIssuesError] = useState<string | null>(null);
 
   useEffect(() => {
     window.cth.getConfig().then((c) => setRepos(c.registeredRepos ?? [])).catch(() => { /* noop */ });
@@ -172,6 +187,33 @@ function FloorTab() {
     setDispatchText('');
     setDispatchMsg(res.ok ? `sent to ${dispatchTo}` : `failed: ${res.error ?? '?'}`);
     setTimeout(() => setDispatchMsg(null), 4000);
+  };
+
+  const fetchIssues = async () => {
+    const repo = issueRepo || repos[0];
+    if (!repo) { setIssuesError('No repo selected.'); return; }
+    setIssuesLoading(true);
+    setIssuesError(null);
+    try {
+      const res = await window.cth.githubIssues(repo);
+      if (res.ok) {
+        setIssues((res.issues ?? []).slice(0, 10));
+      } else {
+        setIssues([]);
+        setIssuesError(res.error ?? 'Failed to fetch issues.');
+      }
+    } catch (e) {
+      setIssues([]);
+      setIssuesError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setIssuesLoading(false);
+    }
+  };
+
+  const assignIssue = (issue: GHIssue) => {
+    const body = (issue.body ?? '').slice(0, 200);
+    setDispatchText(`GitHub Issue #${issue.number}: ${issue.title}\n\n${body}\n\nURL: ${issue.url}`);
+    setDispatchTo('broadcast');
   };
 
   return (
@@ -275,6 +317,59 @@ function FloorTab() {
             ><Icon name="terminal" /></button>
           </div>
         ))}
+      </Section>
+
+      <Section title="ISSUES">
+        {repos.length === 0 && <Muted>No registered repos.</Muted>}
+        {repos.length > 0 && (
+          <>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+              <Select value={issueRepo || repos[0]} onChange={setIssueRepo}>
+                {repos.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </Select>
+              <PixelButton variant="primary" size="sm" onClick={fetchIssues} disabled={issuesLoading}>
+                {issuesLoading ? 'fetching…' : 'Fetch issues'}
+              </PixelButton>
+            </div>
+            {issuesError && (
+              <div style={{
+                fontSize: 12, color: 'var(--cth-ink-700)', marginBottom: 6,
+                padding: 6, background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+                wordBreak: 'break-word'
+              }}>{issuesError}</div>
+            )}
+            {!issuesError && !issuesLoading && issues.length === 0 && <Muted>No issues fetched yet.</Muted>}
+            {issues.map((issue) => (
+              <div key={issue.number} style={{
+                display: 'flex', flexDirection: 'column', gap: 4,
+                padding: 6, marginBottom: 6,
+                background: 'var(--cth-paper-100)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                  <span style={{ fontSize: 12, color: 'var(--cth-ink-900)', flex: 1, wordBreak: 'break-word' }}>
+                    <strong>#{issue.number}</strong> {issue.title}
+                  </span>
+                  <PixelButton variant="secondary" size="sm" onClick={() => assignIssue(issue)}>
+                    Assign
+                  </PixelButton>
+                </div>
+                {issue.labels.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {issue.labels.map((label) => (
+                      <span key={label} style={{
+                        fontSize: 10, lineHeight: '14px', padding: '0 5px',
+                        background: 'var(--cth-cream-200)', boxShadow: 'inset 0 0 0 1px var(--cth-ink-300)',
+                        color: 'var(--cth-ink-700)'
+                      }}>{label}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </>
+        )}
       </Section>
     </Scroll>
   );
