@@ -337,9 +337,14 @@ interface LogEntry { ts?: number; kind?: string; [k: string]: unknown }
 
 function ActivityTab() {
   const agents = useStore((s) => s.agents);
-  const toolCounts = useStore((s) => s.toolCounts);
   const [log, setLog] = useState<LogEntry[]>([]);
   const [board, setBoard] = useState('');
+  // Per-agent estimated cost, reported up by each UsageRow so the bars can be
+  // normalized against the most-expensive agent in the office.
+  const [costs, setCosts] = useState<Record<string, number>>({});
+  const reportCost = (id: string) => (cost: number) =>
+    setCosts((prev) => (prev[id] === cost ? prev : { ...prev, [id]: cost }));
+  const maxCost = Math.max(0.0001, ...agents.map((a) => costs[a.id] ?? 0));
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -367,13 +372,9 @@ function ActivityTab() {
     <Scroll>
       <Section title="USAGE (this session)">
         {agents.map((a) => (
-          <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-            <span style={{ fontSize: 12, color: 'var(--cth-ink-700)', width: 90 }}>{a.name}</span>
-            <Bar value={toolCounts[a.id] ?? 0} max={Math.max(1, ...agents.map((x) => toolCounts[x.id] ?? 0))} />
-            <span style={{ fontSize: 11, color: 'var(--cth-ink-500)' }}>{toolCounts[a.id] ?? 0}</span>
-          </div>
+          <UsageRow key={a.id} name={a.name} cwd={a.cwd} maxCost={maxCost} onCost={reportCost(a.id)} />
         ))}
-        <Muted>tool calls this session (not billed $ — interactive sessions don't expose cost)</Muted>
+        <Muted>tokens from ~/.claude/projects/ transcripts</Muted>
       </Section>
 
       <Section title="ACTIVITY">
@@ -390,6 +391,45 @@ function ActivityTab() {
         <Pre>{board || 'The board is empty.'}</Pre>
       </Section>
     </Scroll>
+  );
+}
+
+/** One agent's real token usage, polled from its Claude Code transcripts on
+ *  mount and every 10s. Renders: name | input Kt | output Kt | est $X.XX, with
+ *  a bar normalized to the most-expensive agent (via the lifted-up cost). */
+function UsageRow({ name, cwd, maxCost, onCost }: {
+  name: string; cwd: string; maxCost: number; onCost: (cost: number) => void;
+}) {
+  const [usage, setUsage] = useState<{ inputTokens: number; outputTokens: number; estimatedCostUsd: number } | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const refresh = async () => {
+      try {
+        const u = await window.cth.agentUsage(cwd);
+        if (!alive || !u) return;
+        setUsage(u);
+        onCost(u.estimatedCostUsd);
+      } catch { /* noop */ }
+    };
+    refresh();
+    const id = setInterval(refresh, 10000);
+    return () => { alive = false; clearInterval(id); };
+    // onCost is recreated each render but stable in behavior; cwd is the real key.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cwd]);
+
+  const inK = usage ? (usage.inputTokens / 1000).toFixed(1) : '0.0';
+  const outK = usage ? (usage.outputTokens / 1000).toFixed(1) : '0.0';
+  const cost = usage?.estimatedCostUsd ?? 0;
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+      <span style={{ fontSize: 12, color: 'var(--cth-ink-700)', width: 90 }}>{name}</span>
+      <Bar value={cost} max={maxCost} />
+      <span style={{ fontSize: 11, color: 'var(--cth-ink-500)', width: 56, textAlign: 'right' }}>{inK}/{outK}Kt</span>
+      <span style={{ fontSize: 11, color: 'var(--cth-ink-700)', width: 52, textAlign: 'right' }}>${cost.toFixed(2)}</span>
+    </div>
   );
 }
 
