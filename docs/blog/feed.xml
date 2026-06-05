@@ -48,6 +48,14 @@
     <summary>How the Model Context Protocol gets attacked — tool poisoning, rug pulls, command injection — and the layered defenses that secure your MCP tools.</summary>
   </entry>
   <entry>
+    <title>Multi-Agent Orchestration Patterns: Which Topology, and When</title>
+    <link href="https://munderdiffl.in/blog/multi-agent-orchestration-patterns/" />
+    <id>https://munderdiffl.in/blog/multi-agent-orchestration-patterns/</id>
+    <published>2026-06-05T00:00:00.000Z</published>
+    <updated>2026-06-05T00:00:00.000Z</updated><category term="Orchestration" />
+    <summary>The multi-agent orchestration patterns — orchestrator-worker, pipeline, fan-out, debate, swarm, blackboard — when to use each, and when one agent wins.</summary>
+  </entry>
+  <entry>
     <title>The Multi-Agent Cost Playbook: Five Levers to Cut AI Agent Spend</title>
     <link href="https://munderdiffl.in/blog/the-multi-agent-cost-playbook/" />
     <id>https://munderdiffl.in/blog/the-multi-agent-cost-playbook/</id>
@@ -478,13 +486,5 @@
     <published>2026-06-02T00:00:00.000Z</published>
     <updated>2026-06-02T00:00:00.000Z</updated><category term="Concepts" />
     <summary>Answers to the top Munder Difflin questions — what it is, is it free, does it run locally, which platforms, and how it differs from many terminals.</summary>
-  </entry>
-  <entry>
-    <title>Run an Office of AI Agents While You Sleep</title>
-    <link href="https://munderdiffl.in/blog/run-an-office-of-ai-agents/" />
-    <id>https://munderdiffl.in/blog/run-an-office-of-ai-agents/</id>
-    <published>2026-06-02T00:00:00.000Z</published>
-    <updated>2026-06-02T00:00:00.000Z</updated><category term="Use Cases" />
-    <summary>What it takes to run a self-coordinating office of AI coding agents that keeps shipping after you log off — and the guardrails that keep it sane.</summary>
   </entry>
 </feed>
