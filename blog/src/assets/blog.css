@@ -435,6 +435,24 @@ footer { border-top: 2px solid var(--ink); background: var(--cream); margin-top:
 .center-stage p { margin-top: 14px; color: var(--ink-dim); }
 .center-stage .btn { margin-top: 26px; }
 
+/* ---------- mobile overflow fix ----------
+   Two real bugs showed up on phones (<=430px):
+   1) .post-head and .post-wrap set `padding: V 0 V`, which clobbers the side
+      padding `.wrap` provides — so post content (dek, TL;DR, prose) had ZERO
+      horizontal padding and ran flush to both edges, clipping on the right
+      under body{overflow-x:hidden}. Restore the side padding at/below the
+      layout's max-width range (desktop > 980px is untouched — no realignment).
+   2) The sticky nav's action buttons (.nav-actions ~192px) plus the brand word
+      pushed the row past the viewport, forcing scrollWidth > innerWidth. Drop
+      the brand word to its mark on phones so the row fits. */
+.prose, .post-head h1, .post-head .dek { overflow-wrap: break-word; }
+@media (max-width: 980px) {
+  .post-head, .post-wrap { padding-left: var(--pad-x); padding-right: var(--pad-x); }
+}
+@media (max-width: 480px) {
+  .brand-word { display: none; }
+}
+
 /* ---------- reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; }
