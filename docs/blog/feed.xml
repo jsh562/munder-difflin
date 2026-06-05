@@ -8,6 +8,14 @@
   <id>https://munderdiffl.in/blog/</id>
   <author><name>Chaitanya Giri</name><uri>https://munderdiffl.in</uri></author>
   <entry>
+    <title>The Best AI Coding Agents in 2026: A Field Guide</title>
+    <link href="https://munderdiffl.in/blog/best-ai-coding-agents/" />
+    <id>https://munderdiffl.in/blog/best-ai-coding-agents/</id>
+    <published>2026-06-05T00:00:00.000Z</published>
+    <updated>2026-06-05T00:00:00.000Z</updated><category term="Comparisons" />
+    <summary>A fair 2026 field guide to the best AI coding agents — Cursor, Aider, Cline, Devin, Copilot — by category, plus where a local multi-agent hive fits.</summary>
+  </entry>
+  <entry>
     <title>Cline vs Munder Difflin: In-Editor Agent or Local Hive?</title>
     <link href="https://munderdiffl.in/blog/cline-vs-munder-difflin/" />
     <id>https://munderdiffl.in/blog/cline-vs-munder-difflin/</id>
@@ -478,13 +486,5 @@
     <published>2026-06-02T00:00:00.000Z</published>
     <updated>2026-06-02T00:00:00.000Z</updated><category term="Orchestration" />
     <summary>Design human-in-the-loop AI agents that stay autonomous: an approvals queue that escalates only spend, destructive ops, and scope changes.</summary>
-  </entry>
-  <entry>
-    <title>Munder Difflin FAQ: Everything People Ask</title>
-    <link href="https://munderdiffl.in/blog/munder-difflin-faq/" />
-    <id>https://munderdiffl.in/blog/munder-difflin-faq/</id>
-    <published>2026-06-02T00:00:00.000Z</published>
-    <updated>2026-06-02T00:00:00.000Z</updated><category term="Concepts" />
-    <summary>Answers to the top Munder Difflin questions — what it is, is it free, does it run locally, which platforms, and how it differs from many terminals.</summary>
   </entry>
 </feed>
