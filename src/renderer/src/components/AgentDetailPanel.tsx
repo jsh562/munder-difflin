@@ -11,6 +11,8 @@ import { disposeTerminal } from './terminalPool';
 import { SidebarTabs } from './SidebarTabs';
 import { FilesTab } from './FilesTab';
 import { ThreadsPanel } from './ThreadsPanel';
+import { ToolWaterfall } from './ToolWaterfall';
+import { AgentControlStrip } from './AgentControlStrip';
 import { Icon } from './Icon';
 import { useStore, type Agent } from '@/store/store';
 import { usePtyParser } from '@/hooks/usePtyParser';
@@ -137,6 +139,9 @@ export function AgentDetailPanel({ agent }: AgentDetailPanelProps) {
         }}>{openTerminalError}</div>
       )}
 
+      {/* #7C — operator control (pause / halt / steer) for live agents */}
+      {isReal && <AgentControlStrip agentId={agent.id} />}
+
       {/* Tabs */}
       <SidebarTabs current={sidebarTab} accent={agent.accent} onChange={setSidebarTab} />
 
@@ -177,6 +182,10 @@ export function AgentDetailPanel({ agent }: AgentDetailPanelProps) {
 
         {sidebarTab === 'messages' && (
           <ThreadsPanel agentId={agent.id} />
+        )}
+
+        {sidebarTab === 'traces' && (
+          <ToolWaterfall agentId={agent.id} />
         )}
       </div>
     </PixelPanel>

@@ -11,7 +11,7 @@ import { ThoughtBubble } from './ThoughtBubble';
 // cover our status model.
 
 export type CharacterAnimation = 'idle' | 'walk' | 'type' | 'read';
-export type StatusGlyph = 'none' | 'blocked' | 'success';
+export type StatusGlyph = 'none' | 'blocked' | 'success' | 'compacting' | 'looping';
 
 function lerp(a: number, b: number, t: number): number {
   const tt = Math.min(Math.max(t, 0), 1);
@@ -439,6 +439,19 @@ export class Character {
       g.rect(-0.5, yTop - s, 1, s * 2).fill(0xffd93d);
       g.rect(-s, yTop - 0.5, s * 2, 1).fill(0xffd93d);
       if (this.glyphElapsed > 0.9) this.setStatusGlyph('none');
+    } else if (this.statusGlyph === 'compacting') {
+      // #5C — violet box that rhythmically "packs down" (boxing up context).
+      const p = (Math.sin(this.glyphElapsed * 6) + 1) / 2; // 0..1
+      const s = 2 + p * 3;
+      g.rect(-s, yTop - s, s * 2, s * 2).fill(0x9b7ede);
+    } else if (this.statusGlyph === 'looping') {
+      // #5C — orange 4-dot warning ring with one lit dot spinning around it.
+      const idx = Math.floor(this.glyphElapsed * 8) % 4;
+      const pts: [number, number][] = [[-3, yTop - 3], [3, yTop - 3], [3, yTop + 3], [-3, yTop + 3]];
+      for (let i = 0; i < 4; i++) {
+        const [x, y] = pts[i];
+        g.rect(x - 1, y - 1, 2, 2).fill(i === idx ? 0xff9f43 : 0x6b5878);
+      }
     }
   }
 

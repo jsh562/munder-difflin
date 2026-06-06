@@ -87,7 +87,7 @@ export interface QueuedMessage {
   ts: number;
 }
 
-export type SidebarTab = 'terminal' | 'files' | 'messages';
+export type SidebarTab = 'terminal' | 'files' | 'messages' | 'traces';
 
 /** Lifecycle of the god agent ("Michael") bootstrap on launch.
  *  'booting' until his PTY is confirmed live, then 'ready' (or 'failed' if the
@@ -270,7 +270,7 @@ const initialSidebarWidth = (() => {
 const initialSidebarTab: SidebarTab = (() => {
   try {
     const v = window.localStorage.getItem(LS_SIDEBAR_TAB);
-    if (v === 'files' || v === 'terminal' || v === 'messages') return v;
+    if (v === 'files' || v === 'terminal' || v === 'messages' || v === 'traces') return v;
   } catch { /* noop */ }
   return 'terminal';
 })();

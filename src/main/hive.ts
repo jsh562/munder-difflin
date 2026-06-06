@@ -137,6 +137,20 @@ export class HiveManager {
 
   private routerTimer: NodeJS.Timeout | null = null;
 
+  /** The embedded OTLP collector's loopback URL, set by the main process once the
+   *  collector is bound (telemetry.ts). null = telemetry off → no OTel env is
+   *  injected at spawn (the transcript reconciler remains the cost source). */
+  private _otelEndpoint: string | null = null;
+  /** Point newly-spawned agents at the live telemetry collector. Call after the
+   *  collector starts; only affects spawns made afterwards. */
+  setOtelEndpoint(url: string | null): void {
+    this._otelEndpoint = url;
+  }
+  /** The collector URL agents are pointed at, or null when telemetry is off. */
+  otelEndpoint(): string | null {
+    return this._otelEndpoint;
+  }
+
   // — paths —
   root(): string | null {
     const home = this.getHome();
@@ -250,6 +264,24 @@ export class HiveManager {
       HIVE_ROOT: root,
       AGENT_DIR: dir
     };
+
+    // Stage 7A — first-party Claude Code telemetry → the embedded loopback OTLP
+    // collector (telemetry.ts). Pure env, no --settings change. Only injected
+    // once the collector is up (otelEndpoint set), so telemetry-off installs and
+    // tests spawn exactly as before. http/json (no protobuf dep). The resource
+    // attrs are the agent↔event join key the collector reads. NOTE: Claude Code
+    // reads these at process start, so they apply only to NEW spawns — an agent
+    // already running won't emit until respawned.
+    if (this._otelEndpoint) {
+      env.CLAUDE_CODE_ENABLE_TELEMETRY = '1';
+      env.OTEL_METRICS_EXPORTER = 'otlp';
+      env.OTEL_LOGS_EXPORTER = 'otlp';
+      env.OTEL_EXPORTER_OTLP_PROTOCOL = 'http/json';
+      env.OTEL_EXPORTER_OTLP_ENDPOINT = this._otelEndpoint;
+      env.OTEL_METRIC_EXPORT_INTERVAL = '5000'; // 5s — near-live without spamming
+      env.OTEL_LOGS_EXPORT_INTERVAL = '2000';
+      env.OTEL_RESOURCE_ATTRIBUTES = `agent.id=${meta.id},agent.name=${meta.name}`;
+    }
     const args = ['--append-system-prompt', this.injectedPrompt(meta, dir, root, opts.semanticMemory ?? false)];
 
     // Phase 1 — autonomy: attach lifecycle hooks via --settings (no edits to the
@@ -301,7 +333,11 @@ export class HiveManager {
         PostToolUse: [entry('*')],
         UserPromptSubmit: [entry()],
         Notification: [entry()],
-        SessionStart: [entry()]
+        SessionStart: [entry()],
+        // #5C: surface mid-`/compact` so an agent boxing up its context reads as
+        // 'compacting' on the floor instead of looking frozen.
+        PreCompact: [entry()],
+        PostCompact: [entry()]
       }
     };
   }

@@ -19,6 +19,9 @@ import { enrichMessage } from './assistant';
 import { readAgentUsage } from './transcript';
 import { listIssues, listCIRuns } from './github';
 import { SlackWebhookServer } from './slack';
+import { TelemetryCollector } from './telemetry';
+import { CircuitBreaker } from './breaker';
+import { ControlRegistry } from './control';
 
 const isDev = !!process.env.ELECTRON_RENDERER_URL;
 const ptyManager = new PtyManager();
@@ -29,7 +32,26 @@ const hive = new HiveManager(
   () => readConfig().harnessHome,
   (channel, payload) => { try { liveWebContents()?.send(channel, payload); } catch { /* window tore down */ } }
 );
-const hookServer = new HookServer(hive, () => liveWebContents(), () => readConfig());
+// #7C — operator control state (pause/gate/steer/halt), read by the HookServer
+// when deciding hook returns.
+const control = new ControlRegistry();
+const hookServer = new HookServer(hive, () => liveWebContents(), () => readConfig(), control);
+// Stage 7A — the live observability tap. Receives Claude Code's first-party OTel
+// over loopback OTLP/JSON and exposes the locked usage-provider seam. resolveCwd
+// lets the transcript fallback find an agent's cwd from the hive registry.
+const telemetry = new TelemetryCollector({
+  emit: (channel, payload) => { try { liveWebContents()?.send(channel, payload); } catch { /* window tore down */ } },
+  resolveCwd: (agentId) => hive.registry().agents[agentId]?.cwd ?? null
+});
+// #7C.4 — interim cost/runaway breaker (Lane A #6 owns the real policy; this is
+// the swap-trivial glue). Pulls the locked usage seam, emits BreakerState on the
+// same control:breakerState channel the renderer's avatar adapter consumes.
+const breaker = new CircuitBreaker({
+  getAgentUsage: (agentId) => telemetry.getAgentUsage(agentId),
+  liveAgents: () => Array.from(ptyToAgent.values()),
+  config: () => { const c = readConfig(); return { agentBudgetUsd: c.agentBudgetUsd, tokenVelocityPerMin: c.tokenVelocityPerMin }; },
+  emit: (state) => { try { liveWebContents()?.send('control:breakerState', state); } catch { /* window tore down */ } }
+});
 const memory = new MemoryManager(
   () => readConfig().harnessHome,
   () => { const c = readConfig(); return { enabled: c.semanticMemory !== false, model: c.embeddingModel ?? 'minilm' }; }
@@ -499,6 +521,8 @@ ipcMain.handle('app:confirmClose', () => {
   try { clearMissionTimers(); } catch (e) { console.error('[quit] clearMissionTimers:', e); }
   try { hive.stopRouter(); } catch (e) { console.error('[quit] stopRouter:', e); }
   try { hookServer.stop(); } catch (e) { console.error('[quit] hookServer.stop:', e); }
+  try { telemetry.stop(); } catch (e) { console.error('[quit] telemetry.stop:', e); }
+  try { breaker.stop(); } catch (e) { console.error('[quit] breaker.stop:', e); }
   try { stopSlackServer(); } catch (e) { console.error('[quit] slack.stop:', e); }
   try { memory.stop(); } catch (e) { console.error('[quit] memory.stop:', e); }
   try { ptyManager.killAll(); } catch (e) { console.error('[quit] killAll:', e); }
@@ -515,6 +539,8 @@ ipcMain.handle('app:resetAll', () => {
   try { clearMissionTimers(); } catch (e) { console.error('[reset] clearMissionTimers:', e); }
   try { hive.stopRouter(); } catch (e) { console.error('[reset] stopRouter:', e); }
   try { hookServer.stop(); } catch (e) { console.error('[reset] hookServer.stop:', e); }
+  try { telemetry.stop(); } catch (e) { console.error('[reset] telemetry.stop:', e); }
+  try { breaker.stop(); } catch (e) { console.error('[reset] breaker.stop:', e); }
   try { stopSlackServer(); } catch (e) { console.error('[reset] slack.stop:', e); }
   try { memory.stop(); } catch (e) { console.error('[reset] memory.stop:', e); }
   try { ptyManager.killAll(); } catch (e) { console.error('[reset] killAll:', e); }
@@ -534,8 +560,59 @@ ipcMain.handle('app:resetAll', () => {
 });
 
 // ─── IPC: token telemetry (real usage + est. cost from CC transcripts) ───────
+// Reconciler/fallback path: per-cwd transcript sum, now priced PER MODEL (cost
+// bug #1 fixed in pricing.ts). Kept for back-compat with the existing UsageRow.
 ipcMain.handle('hive:agentUsage', (_evt, cwd: unknown) =>
   typeof cwd === 'string' ? readAgentUsage(cwd) : null);
+
+// ─── IPC: live telemetry (the OTel collector — the locked usage-provider seam) ─
+// The fleet grid + span waterfall (#7B) read these; Lane A's breaker (#6)
+// consumes getAgentUsage in-process via the provider, not over IPC.
+ipcMain.handle('telemetry:usage', (_evt, agentId: unknown) =>
+  typeof agentId === 'string' ? telemetry.getAgentUsage(agentId) : null);
+ipcMain.handle('telemetry:spans', (_evt, agentId: unknown) =>
+  typeof agentId === 'string' ? telemetry.getSpans(agentId) : []);
+ipcMain.handle('telemetry:snapshot', () => telemetry.snapshot());
+
+// ─── IPC: circuit-breaker state (Lane A #6 policy → this lane's avatars/meter) ─
+// Lane A's breaker calls this with a BreakerState; we fan it out to the renderer
+// on `control:breakerState`, where the avatar adapter gives it precedence over
+// hook-derived status (#5C looping/zombie). Defined here so the channel exists
+// before Jim's policy lands; he produces, this lane consumes.
+ipcMain.handle('control:setBreakerState', (_evt, state: unknown) => {
+  try { liveWebContents()?.send('control:breakerState', state); } catch { /* window tore down */ }
+  return { ok: true };
+});
+
+// ─── IPC: operator control over agents (#7C.1–7C.3) ─────────────────────────
+// All return the agent's fresh control snapshot so the UI can reflect state.
+ipcMain.handle('control:pause', (_evt, agentId: unknown, on: unknown) => {
+  if (typeof agentId !== 'string') return null;
+  control.pause(agentId, on === true);
+  return control.snapshot(agentId);
+});
+ipcMain.handle('control:resume', (_evt, agentId: unknown) => {
+  if (typeof agentId !== 'string') return null;
+  control.resume(agentId);
+  return control.snapshot(agentId);
+});
+ipcMain.handle('control:gateTool', (_evt, agentId: unknown, tool: unknown, on: unknown) => {
+  if (typeof agentId !== 'string' || typeof tool !== 'string') return null;
+  control.gateTool(agentId, tool, on === true);
+  return control.snapshot(agentId);
+});
+ipcMain.handle('control:steer', (_evt, agentId: unknown, text: unknown) => {
+  if (typeof agentId !== 'string' || typeof text !== 'string') return null;
+  control.steer(agentId, text);
+  return control.snapshot(agentId);
+});
+ipcMain.handle('control:halt', (_evt, agentId: unknown) => {
+  if (typeof agentId !== 'string') return null;
+  control.halt(agentId);
+  return control.snapshot(agentId);
+});
+ipcMain.handle('control:snapshot', (_evt, agentId: unknown) =>
+  typeof agentId === 'string' ? control.snapshot(agentId) : null);
 
 // ─── IPC: scheduled missions (recurring auto-dispatch) ──────────────────────
 ipcMain.handle('missions:list', () => readConfig().missions ?? []);
@@ -636,6 +713,14 @@ app.whenReady().then(() => {
     ensureDefaultMissions(); // one-time: seed the built-in hourly ops standup
     syncMissions(); // arm recurring auto-dispatch missions now the router is live
     hookServer.start();
+    // Bind the telemetry collector BEFORE the renderer spawns any agent, then
+    // point the hive at it so every subsequent spawn is instrumented. Best-effort
+    // — a bind failure just leaves telemetry off (transcript reconciler stays).
+    void telemetry.start().then((r) => {
+      if (r.ok && r.endpoint) { hive.setOtelEndpoint(r.endpoint); console.log('[telemetry] collector listening', r.endpoint); }
+      else console.error('[telemetry] collector failed to start:', r.error);
+    });
+    breaker.start(); // #7C.4 — in-process cost/runaway poll (dormant until budgets set)
     memory.start(); // init shared palace + mine loop (no-op without mempalace)
   }
   createWindow();

@@ -523,6 +523,20 @@ export function OfficeFloor() {
             c.showThought(liveActivity(agent, 'needs you'));
             c.walkToTile(rt.waitTile);
             break;
+          case 'compacting':
+            // #5C — mid-/compact: stay put at the desk, "boxing up" glyph + thought,
+            // so an agent compacting context reads as busy rather than frozen.
+            c.setStatusGlyph('compacting');
+            c.sitAtDesk(true);
+            c.showThought(liveActivity(agent, 'compacting context'));
+            break;
+          case 'looping':
+            // #5C — circuit-breaker armed (#6): hold position with the spinning
+            // warning glyph so a runaway agent is visible on the floor.
+            c.setStatusGlyph('looping');
+            c.sitAtDesk(false);
+            c.showThought(liveActivity(agent, 'looping — breaker armed'));
+            break;
           case 'success':
             c.setStatusGlyph('success');
             c.hideThought();

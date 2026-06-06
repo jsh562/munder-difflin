@@ -58,11 +58,22 @@ export function App() {
     for (const a of agents) if (a.ptyId) acquireTerminal(a.ptyId);
   }, [agents]);
 
-  // Mock loop only after onboarding (skip during wizard)
+  // Synthetic demo loop — CAGED (#5B). It must never animate alongside a live
+  // hive (it would fire fake envelope handoffs and step seeded agents). Run it
+  // only as an explicit showcase (VITE_CTH_DEMO=1 in dev) or on a genuinely
+  // empty floor, and stop it the instant the first real PTY agent appears
+  // (Michael always spawns, so in normal operation it effectively never runs).
   useEffect(() => {
     if (!config?.onboardingComplete) return;
-    startMockLoop();
-    return () => stopMockLoop();
+    const DEMO = import.meta.env.DEV && import.meta.env.VITE_CTH_DEMO === '1';
+    const evaluate = () => {
+      const hasLive = useStore.getState().agents.some((a) => a.ptyId);
+      if (DEMO || !hasLive) startMockLoop();
+      else stopMockLoop();
+    };
+    evaluate();
+    const unsub = useStore.subscribe(evaluate);
+    return () => { unsub(); stopMockLoop(); };
   }, [config?.onboardingComplete]);
 
   // Reconcile restored agents against the PTYs still alive in the main process.

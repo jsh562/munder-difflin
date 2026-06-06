@@ -9,6 +9,7 @@ import { TasksKanban } from './TasksKanban';
 import { disposeTerminal } from './terminalPool';
 import { Icon } from './Icon';
 import { MemoryGraphPanel } from './MemoryGraphPanel';
+import { FleetGrid } from './FleetGrid';
 import { useStore, type Agent } from '@/store/store';
 import { usePtyParser } from '@/hooks/usePtyParser';
 import { buildSpawnCommand, AGENT_MODELS } from '@/store/config';
@@ -18,7 +19,7 @@ import { buildSpawnCommand, AGENT_MODELS } from '@/store/config';
  *  per-agent model + dispatch + assistant access), a memory view, and a live
  *  activity feed / board / usage meter. */
 
-type CCTab = 'terminal' | 'floor' | 'tasks' | 'memory' | 'graph' | 'activity' | 'handbook';
+type CCTab = 'terminal' | 'floor' | 'fleet' | 'tasks' | 'memory' | 'graph' | 'activity' | 'handbook';
 
 /** A recurring auto-dispatched mission (mirrors the main-process config type). */
 interface ScheduledMission {
@@ -61,6 +62,7 @@ interface CIRun {
 const TABS: { key: CCTab; label: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
   { key: 'terminal', label: 'terminal', icon: 'terminal' },
   { key: 'floor', label: 'floor', icon: 'mcp' },
+  { key: 'fleet', label: 'fleet', icon: 'gear' },
   { key: 'tasks', label: 'tasks', icon: 'check' },
   { key: 'memory', label: 'memory', icon: 'sparkle' },
   { key: 'graph', label: 'graph', icon: 'web' },
@@ -162,6 +164,7 @@ export function CommandCenterPanel({ agent }: { agent: Agent }) {
           )
         )}
         {tab === 'floor' && <FloorTab seed={dispatchSeed} />}
+        {tab === 'fleet' && <FleetTab />}
         {tab === 'tasks' && (
           <TasksKanban
             onAssign={(prefill) => {
@@ -663,6 +666,21 @@ function MemoryTab({ godId, who: controlledWho, onWho }: { godId: string; who?: 
           {agents.map((a) => (<option key={a.id} value={a.id}>{a.name}</option>))}
         </Select>
         <Pre>{mem || 'No memory recorded yet.'}</Pre>
+      </Section>
+    </Scroll>
+  );
+}
+
+// ─── Fleet tab — the live control-room overview (#7B.1) ──────────────────────
+
+function FleetTab() {
+  return (
+    <Scroll>
+      <Section title="FLEET (live telemetry)">
+        <FleetGrid />
+        <div style={{ marginTop: 6 }}>
+          <Muted>live from each agent&apos;s OpenTelemetry · cost is Claude&apos;s own per-model figure</Muted>
+        </div>
       </Section>
     </Scroll>
   );

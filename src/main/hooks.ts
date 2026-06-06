@@ -16,6 +16,7 @@ import { existsSync, rmSync } from 'node:fs';
 import { Notification, type WebContents } from 'electron';
 import type { HiveManager } from './hive';
 import type { HarnessConfig } from './config';
+import type { ControlRegistry } from './control';
 
 interface HookPayload {
   hook_event_name?: string;
@@ -39,7 +40,9 @@ export class HookServer {
   constructor(
     private hive: HiveManager,
     private getWebContents: () => WebContents | null,
-    private getConfig: () => HarnessConfig
+    private getConfig: () => HarnessConfig,
+    /** #7C — operator control state. Optional so tests can omit it. */
+    private control?: ControlRegistry
   ) {}
 
   start(): void {
@@ -77,6 +80,14 @@ export class HookServer {
     const agentId = p.agent_id ?? undefined;
     const event = p.hook_event_name ?? 'Unknown';
 
+    // 7C.3 — a graceful operator HALT overrides everything (incl. the inbox
+    // drain below): stop the agent CLEANLY at this hook boundary rather than
+    // killing the PTY. session_id is in the payload for a later --resume.
+    if (agentId && this.control?.shouldHalt(agentId)) {
+      this.emit(agentId, event, p);
+      return { continue: false, stopReason: 'Halted by the operator from the floor.' };
+    }
+
     if ((event === 'Stop' || event === 'SubagentStop') && agentId) {
       // Loop guard: a previous Stop hook already blocked this turn → let it stop.
       if (p.stop_hook_active) { this.emit(agentId, event, p); return {}; }
@@ -93,6 +104,35 @@ export class HookServer {
       this.notify(agentId ?? 'Agent', 'finished — idle');
       this.emit(agentId, event, p);
       return {};
+    }
+
+    // 7C.1 — HITL gate: deny a tool call at the PreToolUse boundary when the
+    // agent is paused or this tool is gated. Race-free (immediate return, no
+    // renderer round-trip → can't hit the shim timeout). Slow human APPROVAL is
+    // deliberately left to Claude's native permission prompt.
+    if (event === 'PreToolUse' && agentId && this.control) {
+      const d = this.control.toolDecision(agentId, p.tool_name ?? '');
+      if (d.deny) {
+        this.emitControl(agentId, p.tool_name, d.reason);
+        this.emit(agentId, event, p);
+        return {
+          hookSpecificOutput: {
+            hookEventName: 'PreToolUse',
+            permissionDecision: 'deny',
+            permissionDecisionReason: d.reason ?? 'Denied by operator.'
+          }
+        };
+      }
+    }
+
+    // 7C.2 — mid-run steering: inject queued operator guidance as context on the
+    // next eligible hook (no fragile typing into the TUI). Delivered once.
+    if ((event === 'UserPromptSubmit' || event === 'PostToolUse') && agentId && this.control) {
+      const steer = this.control.takeSteer(agentId);
+      if (steer) {
+        this.emit(agentId, event, p);
+        return { hookSpecificOutput: { hookEventName: event, additionalContext: steer } };
+      }
     }
 
     // A Notification hook that means "the agent is blocked waiting for the user"
@@ -121,6 +161,12 @@ export class HookServer {
       if (!Notification.isSupported()) return;
       new Notification({ title, body }).show();
     } catch { /* notifications unsupported on this platform — ignore */ }
+  }
+
+  /** Tell the renderer a tool call was gated/denied (#7C.1) so it can surface it
+   *  (toast / control strip) — distinct from the avatar hook stream. */
+  private emitControl(agentId: string, tool: string | undefined, reason: string | undefined): void {
+    this.getWebContents()?.send('control:approvalRequest', { agentId, tool, reason });
   }
 
   private emit(agentId: string | undefined, event: string, p: HookPayload, blocked = false): void {

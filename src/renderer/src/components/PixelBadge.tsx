@@ -1,7 +1,10 @@
 import { CSSProperties } from 'react';
 
 export type StatusKind =
-  | 'idle' | 'thinking' | 'working' | 'waiting' | 'blocked' | 'success' | 'ghost';
+  | 'idle' | 'thinking' | 'working' | 'waiting' | 'blocked' | 'success' | 'ghost'
+  // #5C — richer states driven by real events: PreCompact/PostCompact hooks and
+  // the Lane A circuit breaker (#6) respectively.
+  | 'compacting' | 'looping';
 
 export interface PixelBadgeProps {
   status: StatusKind;
@@ -16,7 +19,9 @@ const colorByStatus: Record<StatusKind, string> = {
   waiting:  'var(--cth-status-waiting)',
   blocked:  'var(--cth-status-blocked)',
   success:  'var(--cth-status-success)',
-  ghost:    'var(--cth-status-ghost)'
+  ghost:    'var(--cth-status-ghost)',
+  compacting: 'var(--cth-status-compacting)',
+  looping:    'var(--cth-status-looping)'
 };
 
 // Human-readable labels. "blocked" is reserved for the god agent waiting on YOU,
@@ -29,7 +34,9 @@ const labelByStatus: Record<StatusKind, string> = {
   waiting:  'waiting',
   blocked:  'needs you',
   success:  'done',
-  ghost:    'gone'
+  ghost:    'gone',
+  compacting: 'compacting',
+  looping:    'looping'
 };
 
 export function PixelBadge({ status, label, style }: PixelBadgeProps) {
