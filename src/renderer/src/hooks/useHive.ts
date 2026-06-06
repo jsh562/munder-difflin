@@ -59,8 +59,18 @@ const TOOL_STATION: Record<string, { station: StationKind; carry?: ToolKind }> =
   Glob: { station: 'shelf', carry: 'Glob' },
   WebFetch: { station: 'web', carry: 'WebFetch' },
   WebSearch: { station: 'web', carry: 'WebSearch' },
-  TodoWrite: { station: 'board', carry: 'TodoWrite' }
+  TodoWrite: { station: 'board', carry: 'TodoWrite' },
+  // #5A — delegating to a sub-agent reads as "handing off at the outbox".
+  Task: { station: 'mailbox', carry: 'TodoWrite' }
 };
+
+/** Resolve a tool name to its station/glyph. Falls back: any `mcp__*` tool →
+ *  the MCP station (previously these silently sat at the desk, #5A gap); anything
+ *  else → the desk. */
+function stationForTool(tool: string): { station: StationKind; carry?: ToolKind } {
+  return TOOL_STATION[tool]
+    ?? (tool.startsWith('mcp__') ? { station: 'mcp', carry: 'MCP' } : { station: 'desk' });
+}
 
 /**
  * The renderer-side glue for the hive:
@@ -221,7 +231,7 @@ export function useHive(config: HarnessConfig | null): void {
       // Hook events are the authoritative status source for real agents (the
       // pty-stream parser only refines the on-floor action/station).
       if (e.event === 'PreToolUse' && e.tool) {
-        const m = TOOL_STATION[e.tool] ?? { station: 'desk' as StationKind };
+        const m = stationForTool(e.tool);
         updateAgent(e.agentId, { status: 'working', currentStation: m.station, carrying: m.carry, action: `using ${e.tool}` });
         useStore.getState().bumpToolCount(e.agentId); // usage proxy for the command center
       } else if (e.event === 'PostToolUse' || e.event === 'UserPromptSubmit') {
