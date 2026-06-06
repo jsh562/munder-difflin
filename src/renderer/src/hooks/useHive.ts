@@ -8,10 +8,16 @@ const ASSISTANT_ID = 'assistant';
 const ASSISTANT_PTY = `pty-${ASSISTANT_ID}`;
 
 // How long to let Claude Code's TUI finish booting before we type the first
-// thing into Michael's terminal, and the gap between the remote-control command
-// and the orientation prompt so the slash command settles first.
+// thing into Michael's terminal, and how long to PAUSE after the /remote-control
+// command so the slash command lands + executes on its own line before the
+// orientation prompt follows (otherwise they jam into one line and the TUI shows
+// "Unknown command: /remote-control…").
 const GOD_BOOT_MS = 4000;
-const GOD_STEP_MS = 1800;
+const REMOTE_CONTROL_SETTLE_MS = 1500;
+// After a god/agent spawn, hold off the inbox-wake + queue-drain typers for this
+// long so they can't interleave with the boot sequence (remote-control +
+// orientation) and jam the input line.
+const BOOT_GRACE_MS = GOD_BOOT_MS + REMOTE_CONTROL_SETTLE_MS + 2500;
 
 // The first thing Michael (god) is told on a fresh spawn — orient him and put
 // him to work running the floor. Kept terse and action-oriented.
@@ -23,6 +29,12 @@ const INITIAL_GOD_PROMPT = [
   'Then begin orchestrating: triage requests, delegate work to the team, and keep everyone unblocked. You are fully autonomous — there is no approval queue, so handle tool-permission prompts in this session yourself (the human can approve them remotely from their phone).'
 ].join('\n');
 
+// Per-pty submission chain. Every submitToPty for a given pty is appended here so
+// two callers (e.g. the boot sequence's /remote-control and the inbox-wake nudge)
+// can NEVER interleave their text + Enter — which jammed them onto one line and
+// produced "Unknown command: /remote-control<next prompt>".
+const writeChains = new Map<string, Promise<void>>();
+
 /**
  * Type a line into an agent's Claude Code TUI and actually submit it.
  *
@@ -31,11 +43,20 @@ const INITIAL_GOD_PROMPT = [
  * input box instead of submitting — the command just sits there as text. We
  * send the text first, then the Enter as a separate keystroke a tick later so
  * the prompt is registered and executed. Idle autonomous agents thus act on a
- * dispatched instruction on their own. */
-async function submitToPty(ptyId: string, text: string): Promise<void> {
-  await window.cth.writePty(ptyId, text);
-  await new Promise((r) => setTimeout(r, 140));
-  await window.cth.writePty(ptyId, '\r');
+ * dispatched instruction on their own.
+ *
+ * Submissions to the same pty are serialized (and each settles for `settleMs`
+ * after Enter) so concurrent callers can't jam their input together. */
+function submitToPty(ptyId: string, text: string, settleMs = 250): Promise<void> {
+  const prev = writeChains.get(ptyId) ?? Promise.resolve();
+  const next = prev.catch(() => { /* a failed prior write must not stall the chain */ }).then(async () => {
+    await window.cth.writePty(ptyId, text);
+    await new Promise((r) => setTimeout(r, 140));
+    await window.cth.writePty(ptyId, '\r');
+    await new Promise((r) => setTimeout(r, settleMs));
+  });
+  writeChains.set(ptyId, next);
+  return next;
 }
 
 /** Wrap a user message as an enrich task for the assistant. The assistant's
@@ -94,6 +115,10 @@ export function useHive(config: HarnessConfig | null): void {
   // the spawnPty call is otherwise racy).
   const godSpawning = useRef(false);
   const assistantSpawning = useRef(false);
+  // Per-agent timestamp until which auto-typers (inbox-wake #3, queue-drain #4)
+  // must leave the agent alone — set while its boot sequence is typing so nothing
+  // collides with /remote-control + the orientation prompt.
+  const bootGraceUntil = useRef<Record<string, number>>({});
   // Reactive so the assistant bootstrap (effect #1b) re-runs once Michael is ready.
   const godStatus = useStore((s) => s.godStatus);
   // #5C/#7C.4 — latest circuit-breaker level per agent. When 'constrained'/
@@ -157,15 +182,18 @@ export function useHive(config: HarnessConfig | null): void {
       // Fresh spawn → kick Michael off once his TUI is up. First enable remote
       // control so the human can approve permission prompts from their phone
       // (best-effort — a failed/unknown slash command just prints to his terminal
-      // and is harmless), then hand him the orientation prompt to start running
-      // the floor. Restored sessions (the live-PTY branch above) skip this.
+      // and is harmless), PAUSE so it lands on its own line, then hand him the
+      // orientation prompt. Both go through the per-pty submit chain, so they're
+      // strictly sequential and can't jam together; the boot-grace window keeps
+      // the inbox-wake/drain loops off Michael until he's oriented. Restored
+      // sessions (the live-PTY branch above) skip this.
+      bootGraceUntil.current[GOD_ID] = Date.now() + BOOT_GRACE_MS;
       timers.push(setTimeout(() => {
         if (cancelled) return;
-        submitToPty(GOD_PTY, '/remote-control').catch(() => { /* best-effort */ });
-        timers.push(setTimeout(() => {
-          if (cancelled) return;
-          submitToPty(GOD_PTY, INITIAL_GOD_PROMPT).catch(() => { /* pty may have died */ });
-        }, GOD_STEP_MS));
+        // settleMs pauses the chain ~1.5s after /remote-control before the
+        // orientation prompt is submitted next.
+        submitToPty(GOD_PTY, '/remote-control', REMOTE_CONTROL_SETTLE_MS).catch(() => { /* best-effort */ });
+        submitToPty(GOD_PTY, INITIAL_GOD_PROMPT).catch(() => { /* pty may have died */ });
       }, GOD_BOOT_MS));
     }, 1200);
     return () => { cancelled = true; clearTimeout(t); timers.forEach(clearTimeout); };
@@ -311,8 +339,12 @@ export function useHive(config: HarnessConfig | null): void {
   useEffect(() => {
     if (!config?.onboardingComplete) return;
     const iv = setInterval(async () => {
+      const now = Date.now();
       const agents = useStore.getState().agents.filter(
         (a) => a.ptyId && !a.isAssistant && (a.status === 'idle' || a.status === 'waiting')
+          // Don't type into an agent still running its boot sequence — the nudge
+          // would collide with /remote-control + the orientation prompt.
+          && (bootGraceUntil.current[a.id] ?? 0) < now
       );
       for (const a of agents) {
         try {
@@ -353,6 +385,8 @@ export function useHive(config: HarnessConfig | null): void {
       const next = messageQueues[srcId]?.[0];
       if (!next || !target?.ptyId || target.status !== 'idle') return false;
       const now = Date.now();
+      // Hold queued messages until the target finishes its boot sequence.
+      if ((bootGraceUntil.current[target.id] ?? 0) >= now) return false;
       if (now - (lastFlush.current[target.id] ?? 0) < FLUSH_COOLDOWN_MS) return false;
       lastFlush.current[target.id] = now;
       // Remove first so a burst of store updates can't double-send the same one.
