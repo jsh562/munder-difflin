@@ -169,6 +169,14 @@ export interface ToolSpan {
   error?: string;
 }
 
+/** Per-agent operator-control state (#7C.1–7C.3). */
+export interface AgentControlSnapshot {
+  paused: boolean;
+  halted: boolean;
+  gatedTools: string[];
+  pendingSteers: number;
+}
+
 /** Circuit-breaker state (Lane A #6 → this lane's avatars/meter). */
 export interface BreakerState {
   agentId: string;
@@ -362,6 +370,32 @@ const api = {
   /** Push a breaker state to the renderer (Lane A's policy / interim glue calls this). */
   setBreakerState: (state: BreakerState): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('control:setBreakerState', state),
+
+  // ─── Operator control over agents (#7C.1–7C.3) ──────────────────────────────
+  /** Pause/unpause an agent — paused → its tool calls are denied at PreToolUse. */
+  controlPause: (agentId: string, on: boolean): Promise<AgentControlSnapshot | null> =>
+    ipcRenderer.invoke('control:pause', agentId, on),
+  /** Clear pause + halt so the agent can run again. */
+  controlResume: (agentId: string): Promise<AgentControlSnapshot | null> =>
+    ipcRenderer.invoke('control:resume', agentId),
+  /** Gate/ungate a specific tool for an agent (denied at PreToolUse). */
+  controlGateTool: (agentId: string, tool: string, on: boolean): Promise<AgentControlSnapshot | null> =>
+    ipcRenderer.invoke('control:gateTool', agentId, tool, on),
+  /** Queue a steer note — injected as context on the agent's next hook (#7C.2). */
+  controlSteer: (agentId: string, text: string): Promise<AgentControlSnapshot | null> =>
+    ipcRenderer.invoke('control:steer', agentId, text),
+  /** Request a graceful stop at the next hook boundary (#7C.3). */
+  controlHalt: (agentId: string): Promise<AgentControlSnapshot | null> =>
+    ipcRenderer.invoke('control:halt', agentId),
+  /** Read an agent's current control snapshot. */
+  controlSnapshot: (agentId: string): Promise<AgentControlSnapshot | null> =>
+    ipcRenderer.invoke('control:snapshot', agentId),
+  /** Subscribe to gate/deny events (a tool was blocked); returns unsubscribe fn. */
+  onApprovalRequest: (cb: (e: { agentId: string; tool?: string; reason?: string }) => void): (() => void) => {
+    const listener = (_e: IpcRendererEvent, payload: { agentId: string; tool?: string; reason?: string }) => cb(payload);
+    ipcRenderer.on('control:approvalRequest', listener);
+    return () => ipcRenderer.removeListener('control:approvalRequest', listener);
+  },
 
   // ─── Task kanban (hive/tasks.json) ───────────────────────────────────────
   /** Overwrite the hive task ledger with the full task list and commit it. */

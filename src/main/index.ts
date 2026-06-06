@@ -21,6 +21,7 @@ import { listIssues, listCIRuns } from './github';
 import { SlackWebhookServer } from './slack';
 import { TelemetryCollector } from './telemetry';
 import { CircuitBreaker } from './breaker';
+import { ControlRegistry } from './control';
 
 const isDev = !!process.env.ELECTRON_RENDERER_URL;
 const ptyManager = new PtyManager();
@@ -31,7 +32,10 @@ const hive = new HiveManager(
   () => readConfig().harnessHome,
   (channel, payload) => { try { liveWebContents()?.send(channel, payload); } catch { /* window tore down */ } }
 );
-const hookServer = new HookServer(hive, () => liveWebContents(), () => readConfig());
+// #7C — operator control state (pause/gate/steer/halt), read by the HookServer
+// when deciding hook returns.
+const control = new ControlRegistry();
+const hookServer = new HookServer(hive, () => liveWebContents(), () => readConfig(), control);
 // Stage 7A — the live observability tap. Receives Claude Code's first-party OTel
 // over loopback OTLP/JSON and exposes the locked usage-provider seam. resolveCwd
 // lets the transcript fallback find an agent's cwd from the hive registry.
@@ -579,6 +583,36 @@ ipcMain.handle('control:setBreakerState', (_evt, state: unknown) => {
   try { liveWebContents()?.send('control:breakerState', state); } catch { /* window tore down */ }
   return { ok: true };
 });
+
+// ─── IPC: operator control over agents (#7C.1–7C.3) ─────────────────────────
+// All return the agent's fresh control snapshot so the UI can reflect state.
+ipcMain.handle('control:pause', (_evt, agentId: unknown, on: unknown) => {
+  if (typeof agentId !== 'string') return null;
+  control.pause(agentId, on === true);
+  return control.snapshot(agentId);
+});
+ipcMain.handle('control:resume', (_evt, agentId: unknown) => {
+  if (typeof agentId !== 'string') return null;
+  control.resume(agentId);
+  return control.snapshot(agentId);
+});
+ipcMain.handle('control:gateTool', (_evt, agentId: unknown, tool: unknown, on: unknown) => {
+  if (typeof agentId !== 'string' || typeof tool !== 'string') return null;
+  control.gateTool(agentId, tool, on === true);
+  return control.snapshot(agentId);
+});
+ipcMain.handle('control:steer', (_evt, agentId: unknown, text: unknown) => {
+  if (typeof agentId !== 'string' || typeof text !== 'string') return null;
+  control.steer(agentId, text);
+  return control.snapshot(agentId);
+});
+ipcMain.handle('control:halt', (_evt, agentId: unknown) => {
+  if (typeof agentId !== 'string') return null;
+  control.halt(agentId);
+  return control.snapshot(agentId);
+});
+ipcMain.handle('control:snapshot', (_evt, agentId: unknown) =>
+  typeof agentId === 'string' ? control.snapshot(agentId) : null);
 
 // ─── IPC: scheduled missions (recurring auto-dispatch) ──────────────────────
 ipcMain.handle('missions:list', () => readConfig().missions ?? []);

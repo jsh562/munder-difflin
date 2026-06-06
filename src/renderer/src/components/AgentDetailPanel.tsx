@@ -12,6 +12,7 @@ import { SidebarTabs } from './SidebarTabs';
 import { FilesTab } from './FilesTab';
 import { ThreadsPanel } from './ThreadsPanel';
 import { ToolWaterfall } from './ToolWaterfall';
+import { AgentControlStrip } from './AgentControlStrip';
 import { Icon } from './Icon';
 import { useStore, type Agent } from '@/store/store';
 import { usePtyParser } from '@/hooks/usePtyParser';
@@ -137,6 +138,9 @@ export function AgentDetailPanel({ agent }: AgentDetailPanelProps) {
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
         }}>{openTerminalError}</div>
       )}
+
+      {/* #7C — operator control (pause / halt / steer) for live agents */}
+      {isReal && <AgentControlStrip agentId={agent.id} />}
 
       {/* Tabs */}
       <SidebarTabs current={sidebarTab} accent={agent.accent} onChange={setSidebarTab} />
