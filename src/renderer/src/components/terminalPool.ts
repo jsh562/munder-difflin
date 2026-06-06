@@ -54,6 +54,15 @@ export function acquireTerminal(ptyId: string, theme?: ThemeMap, fontSize = 14):
     cursorBlink: true,
     cursorStyle: 'block',
     scrollback: 10000,
+    // Guarantee legible text no matter what colors a running program sets.
+    // When a program paints a coloured cell background (e.g. a git-diff add line
+    // with a green bg, or a yellow-highlighted line) while leaving the default
+    // foreground, the theme's dark ink would otherwise render dark-on-colour and
+    // be unreadable on the light/cream theme. xterm auto-adjusts the foreground
+    // per cell to keep at least this contrast ratio (WCAG AA = 4.5) against the
+    // actual background — so it also rescues low-contrast coloured *text* on the
+    // cream paper. Untouched for already-high-contrast cells (the dark theme).
+    minimumContrastRatio: 4.5,
     allowProposedApi: true
   });
   const fit = new FitAddon();
