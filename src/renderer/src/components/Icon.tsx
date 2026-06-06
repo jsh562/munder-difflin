@@ -16,10 +16,11 @@ interface IconDef {
 
 const paths: Record<IconName, IconDef> = {
   // 16x16 each, designed on pixel grid
+  // Cog with four teeth (N/S/E/W) + a square hub hole. The hole is a second
+  // subpath cut out via fill-rule: evenodd (set on the <path> below).
   gear: {
     accentColor: 'var(--cth-ink-300)',
-    ink:   'M6 1h4v2h1v1h2v1h2v4h-2v1h-1v2h-2v2H6v-2H4v-2H3v-1H1V7h2V6h1V5h2V4h0V1zM7 6v1H6v1H5v1h1v1h1v1h2v-1h1V9h1V8h-1V7h-1V6H7z',
-    accent:'M7 6h2v1h1v2h-1v1H7V9H6V7h1V6z'
+    ink:   'M6 1h4v3h2v2h3v4h-3v2h-2v3h-4v-3h-2v-2h-3v-4h3v-2h2v-3zM6 6h4v4h-4z'
   },
   plus: {
     accentColor: 'var(--cth-mint)',
@@ -97,11 +98,12 @@ export function Icon({ name, size = 1, style }: IconProps) {
       viewBox="0 0 16 16"
       width={dim}
       height={dim}
+      shapeRendering="crispEdges"
       style={{ display: 'inline-block', ...style }}
       aria-hidden
     >
-      {def.accent && <path d={def.accent} fill={def.accentColor} />}
-      <path d={def.ink} fill="var(--cth-ink-900)" />
+      {def.accent && <path d={def.accent} fill={def.accentColor} fillRule="evenodd" />}
+      <path d={def.ink} fill="var(--cth-ink-900)" fillRule="evenodd" />
     </svg>
   );
 }

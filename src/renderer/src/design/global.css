@@ -69,6 +69,19 @@ canvas, img, svg { image-rendering: pixelated; image-rendering: crisp-edges; }
 .cth-titlebar-drag { -webkit-app-region: drag; }
 .cth-titlebar-nodrag { -webkit-app-region: no-drag; }
 
+/* Settings (gear) button in the title bar — a clear bordered chip with a
+   neo-brutalist hover (lemon fill + offset shadow) so it reads as a button. */
+.cth-settings-btn { transition: background 80ms steps(2), box-shadow 80ms steps(2), transform 80ms steps(2); }
+.cth-settings-btn:hover {
+  background: var(--cth-lemon) !important;
+  box-shadow: inset 0 0 0 1.5px var(--cth-ink-900), 2px 2px 0 0 var(--cth-ink-900) !important;
+  transform: translate(-1px, -1px);
+}
+.cth-settings-btn:active {
+  transform: translate(0, 0);
+  box-shadow: inset 0 0 0 1.5px var(--cth-ink-900) !important;
+}
+
 /* Keyframes — pixel-style: step-based, no easing */
 @keyframes cth-blink {
   0%, 49% { opacity: 1; }

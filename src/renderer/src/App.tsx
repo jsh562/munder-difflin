@@ -138,19 +138,21 @@ export function App() {
           v0.1 · {config.autoMode ? 'auto mode on' : 'auto mode off'}
         </span>
         <button
-          className="cth-titlebar-nodrag"
+          className="cth-titlebar-nodrag cth-settings-btn"
           onClick={() => setSettingsOpen(true)}
           title="Settings"
           aria-label="Settings"
           style={{
             marginLeft: 'auto',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: 24, height: 24, padding: 0,
-            background: 'transparent', border: 'none', cursor: 'pointer',
-            color: 'var(--cth-ink-700)'
+            width: 28, height: 28, padding: 0,
+            background: 'var(--cth-paper-100)',
+            boxShadow: 'inset 0 0 0 1.5px var(--cth-ink-900)',
+            border: 'none', borderRadius: 2, cursor: 'pointer',
+            color: 'var(--cth-ink-900)'
           }}
         >
-          <Icon name="gear" />
+          <Icon name="gear" size={1} style={{ width: 18, height: 18 }} />
         </button>
       </div>
 
