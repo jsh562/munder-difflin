@@ -382,6 +382,10 @@ export function useHive(config: HarnessConfig | null): void {
   //     response — no probing, no transcript guesswork.
   useEffect(() => {
     return window.cth.onHiveContextUpdate(({ agentId, tokens, limit }) => {
+      // Defense-in-depth: the main process already filters limit > 0, but the
+      // renderer must not trust IPC blindly — limit 0 would put NaN progress
+      // into the store (NaN survives the Math.min/max clamp).
+      if (!Number.isFinite(limit) || limit <= 0 || !Number.isFinite(tokens)) return;
       const progress = Math.max(0, Math.min(8, Math.round((tokens / limit) * 8)));
       useStore.getState().updateAgent(agentId, { contextTokens: tokens, contextLimit: limit, progress });
     });

@@ -104,7 +104,11 @@ export class HookServer {
     // exposes). Forward to the renderer for the agent-card context gauge.
     // Handled FIRST and returned early: this is pure telemetry from the
     // statusLine shim, not a real hook boundary — it must never trip the
-    // HALT gate or feed the breaker's loop detector below.
+    // HALT gate or feed the breaker's loop detector below. The early return
+    // also (deliberately) skips recordSession for status ticks: a statusLine
+    // payload's session_id adds nothing the real hooks don't already record,
+    // and telemetry should never write to the registry. transcript_path IS
+    // still captured above, where every payload shape benefits from it.
     if (event === 'Status') {
       const cw = p.context_window;
       if (agentId && cw && typeof cw.total_input_tokens === 'number'
