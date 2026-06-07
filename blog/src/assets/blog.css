@@ -147,7 +147,7 @@ nav .links a:hover, nav .links a[aria-current="page"] { color: var(--ink); }
 }
 
 /* ---------- page header ---------- */
-.page-head { padding: 64px 0 28px; }
+.page-head { padding-top: 64px; padding-bottom: 28px; }
 .page-head h1 {
   font-family: var(--font-mono); font-weight: 600;
   font-size: clamp(30px, 5vw, 50px); line-height: 1.04; letter-spacing: -.03em;
@@ -191,6 +191,9 @@ nav .links a:hover, nav .links a[aria-current="page"] { color: var(--ink); }
   display: grid; gap: 26px;
   grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
   padding: 30px 0 12px;
+}
+@media (max-width: 760px) {
+  .post-grid { grid-template-columns: 1fr; }
 }
 .card {
   display: flex; flex-direction: column;
