@@ -224,7 +224,7 @@ function FloorTab({ seed }: { seed: { text: string; seq: number } }) {
   // Per-agent token limit (overrides the floor budget for that agent), keyed by id.
   const [agentTokenCaps, setAgentTokenCaps] = useState<Record<string, number>>({});
   const [restarting, setRestarting] = useState<string | null>(null);
-  const [dispatchTo, setDispatchTo] = useState<string>('broadcast');
+  const [dispatchTo, setDispatchTo] = useState<string>(''); // '' = Michael decides
   const [dispatchText, setDispatchText] = useState('');
   const [dispatchMsg, setDispatchMsg] = useState<string | null>(null);
   // ── ISSUES section state ──
@@ -308,15 +308,26 @@ function FloorTab({ seed }: { seed: { text: string; seq: number } }) {
     }
   };
 
+  // ALL human dispatch flows through the god — never directly into a worker's
+  // inbox. Direct dispatch bypassed the orchestrator's whole job: no 4-part
+  // contract, no card in tasks.json, no board awareness — and the old
+  // 'broadcast' DEFAULT sent the same task to every worker at once. A worker
+  // picked in the dropdown is forwarded as a SUGGESTION the god may follow.
   const dispatch = async () => {
     const body = dispatchText.trim();
     if (!body) return;
+    const suggested = dispatchTo ? agents.find((a) => a.id === dispatchTo) : undefined;
+    const full = suggested
+      ? `${body}\n\n(The human suggests ${suggested.name} (${suggested.id}) for this — your call as orchestrator.)`
+      : body;
     const res = await window.cth.hiveSend(
-      { to: dispatchTo, act: 'request', subject: 'Task from you', body },
+      { to: 'god', act: 'request', subject: 'Task from the human', body: full },
       'human'
     );
     setDispatchText('');
-    setDispatchMsg(res.ok ? `sent to ${dispatchTo}` : `failed: ${res.error ?? '?'}`);
+    setDispatchMsg(res.ok
+      ? `sent to Michael${suggested ? ` (suggesting ${suggested.name})` : ''}`
+      : `failed: ${res.error ?? '?'}`);
     setTimeout(() => setDispatchMsg(null), 4000);
   };
 
@@ -344,7 +355,7 @@ function FloorTab({ seed }: { seed: { text: string; seq: number } }) {
   const assignIssue = (issue: GHIssue) => {
     const body = (issue.body ?? '').slice(0, 200);
     setDispatchText(`GitHub Issue #${issue.number}: ${issue.title}\n\n${body}\n\nURL: ${issue.url}`);
-    setDispatchTo('broadcast');
+    setDispatchTo(''); // Michael decomposes and assigns — no more broadcast blasts
   };
 
   // Set/clear one agent's token limit; persist the whole map (writeConfig replaces
@@ -376,12 +387,14 @@ function FloorTab({ seed }: { seed: { text: string; seq: number } }) {
 
   return (
     <Scroll>
-      <Section title="DISPATCH">
-        <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+      <Section title="DISPATCH — VIA MICHAEL">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+          <span style={{ fontFamily: 'var(--cth-font-display)', fontSize: 8, color: 'var(--cth-ink-500)', flexShrink: 0 }}>
+            SUGGESTED OWNER
+          </span>
           <Select value={dispatchTo} onChange={setDispatchTo}>
-            <option value="broadcast">everyone (broadcast)</option>
-            <option value="god">Michael</option>
-            {agents.filter((a) => !a.isGod).map((a) => (
+            <option value="">Michael decides</option>
+            {agents.filter((a) => !a.isGod && !a.isAssistant).map((a) => (
               <option key={a.id} value={a.id}>{a.name}</option>
             ))}
           </Select>
@@ -390,7 +403,7 @@ function FloorTab({ seed }: { seed: { text: string; seq: number } }) {
           value={dispatchText}
           onChange={(e) => setDispatchText(e.target.value)}
           rows={2}
-          placeholder="Assign a task… (delivered to the chosen agent's inbox)"
+          placeholder="Describe the task… (Michael decomposes, writes the card, and assigns)"
           style={textareaStyle}
         />
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
