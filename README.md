@@ -2,6 +2,8 @@
 
 <img src="./docs/logo.png" alt="Munder Difflin Inc — Multi-Agent Harness" width="340">
 
+forked, added Deepseek & Minimax M3 support
+
 # Munder Difflin
 
 **Local multi-agent harness for [Claude Code](https://claude.com/claude-code).**
